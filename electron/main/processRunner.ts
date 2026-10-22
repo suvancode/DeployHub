@@ -1,4 +1,4 @@
-import { spawn, SpawnOptions } from 'child_process';
+import { spawn, execSync, SpawnOptions } from 'child_process';
 import { logger } from './logger';
 
 export interface ProcessRunResult {
@@ -68,13 +68,31 @@ export function runProcess(
     let stderr = '';
     let isTimedOut = false;
 
+    const killChildTree = () => {
+      if (child && child.pid) {
+        if (process.platform === 'win32') {
+          try {
+            execSync(`taskkill /pid ${child.pid} /T /F`, { windowsHide: true, stdio: 'ignore' });
+          } catch {
+            try {
+              child.kill('SIGKILL');
+            } catch {
+              // ignore
+            }
+          }
+        } else {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // ignore
+          }
+        }
+      }
+    };
+
     const timer = setTimeout(() => {
       isTimedOut = true;
-      try {
-        child.kill('SIGTERM');
-      } catch {
-        // ignore
-      }
+      killChildTree();
     }, timeoutMs);
 
     if (child.stdout) {
@@ -96,7 +114,8 @@ export function runProcess(
 
     child.on('error', (err) => {
       clearTimeout(timer);
-      logger.error('processRunner', `Process error for ${executable}`, err);
+      killChildTree();
+      logger.error('processRunner', `Process error for ${cmd}`, err);
       reject(err);
     });
 

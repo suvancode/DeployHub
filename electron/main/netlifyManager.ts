@@ -30,7 +30,7 @@ export class NetlifyManager {
   async checkStatus(): Promise<NetlifyStatus> {
     logger.info('netlifyManager', 'Checking Netlify CLI status');
     try {
-      const statusRes = await this.runNetlify(['status']);
+      const statusRes = await this.runNetlify(['status'], { timeoutMs: 8000 });
       const combined = `${statusRes.stdout}\n${statusRes.stderr}`;
 
       if (
@@ -61,7 +61,7 @@ export class NetlifyManager {
         };
       }
 
-      const verRes = await this.runNetlify(['--version']);
+      const verRes = await this.runNetlify(['--version'], { timeoutMs: 8000 });
       if (verRes.code === 0) {
         return {
           installed: true,

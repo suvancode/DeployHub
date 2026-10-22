@@ -20,7 +20,7 @@ export class GitHubManager {
 
     // 1. Check gh installed
     try {
-      const verRes = await runProcess('gh', ['--version']);
+      const verRes = await runProcess('gh', ['--version'], { timeoutMs: 8000 });
       if (verRes.code !== 0) {
         return {
           installed: false,
@@ -38,7 +38,7 @@ export class GitHubManager {
 
     // 2. Check auth status
     try {
-      const authRes = await runProcess('gh', ['auth', 'status']);
+      const authRes = await runProcess('gh', ['auth', 'status'], { timeoutMs: 8000 });
       // Note: gh auth status outputs to stderr in many versions even on success
       const combined = `${authRes.stdout}\n${authRes.stderr}`;
 
@@ -51,7 +51,7 @@ export class GitHubManager {
         let activeUsername = parsedAccounts[0];
         let name: string | undefined;
 
-        const userRes = await runProcess('gh', ['api', 'user']);
+        const userRes = await runProcess('gh', ['api', 'user'], { timeoutMs: 8000 });
         if (userRes.code === 0) {
           try {
             const userJson = JSON.parse(userRes.stdout);

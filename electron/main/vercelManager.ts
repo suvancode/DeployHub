@@ -48,7 +48,7 @@ export class VercelManager {
 
     // 1. Check authentication using vercel whoami
     try {
-      const whoamiRes = await this.runVercel(['whoami']);
+      const whoamiRes = await this.runVercel(['whoami'], { timeoutMs: 8000 });
       const combined = `${whoamiRes.stdout}\n${whoamiRes.stderr}`.trim();
 
       if (whoamiRes.code === 0 && combined) {

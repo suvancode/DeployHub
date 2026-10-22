@@ -345,8 +345,17 @@ export class GitManager {
         ? ['push', '-u', remoteName, branch]
         : ['push', remoteName, branch];
 
+      const pushOptions = {
+        cwd: folderPath,
+        timeoutMs: 60000,
+        env: {
+          ...process.env,
+          GIT_TERMINAL_PROMPT: '0',
+        },
+      };
+
       logger.info('gitManager', `Running git ${args.join(' ')}`);
-      let pushRes = await runProcess('git', args, { cwd: folderPath });
+      let pushRes = await runProcess('git', args, pushOptions);
       let combined = `${pushRes.stdout}\n${pushRes.stderr}`.trim();
 
       // If push failed due to malformed URL (e.g. libcurl rejected spaces) and we haven't tried fixing yet
@@ -359,7 +368,7 @@ export class GitManager {
         if (sanitized !== currentRemoteUrl) {
           logger.info('gitManager', `Push rejected with malformed URL. Attempting auto-fix to "${sanitized}" and retrying push...`);
           await runProcess('git', ['remote', 'set-url', remoteName, sanitized], { cwd: folderPath });
-          pushRes = await runProcess('git', args, { cwd: folderPath });
+          pushRes = await runProcess('git', args, pushOptions);
           combined = `${pushRes.stdout}\n${pushRes.stderr}`.trim();
           if (pushRes.code === 0) {
             autoFixed = true;

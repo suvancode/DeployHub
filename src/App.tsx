@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ProjectRecord,
   GitHubAccountStatus,
@@ -41,17 +41,21 @@ export const App: React.FC = () => {
       if (window.deployHubAPI) {
         const list = await window.deployHubAPI.getProjects();
         setProjects(list);
-        if (selectedProject) {
-          const updated = list.find((p) => p.id === selectedProject.id);
-          if (updated) setSelectedProject(updated);
-        }
+        setSelectedProject((current) => {
+          if (!current) return current;
+          const updated = list.find((p) => p.id === current.id);
+          return updated || current;
+        });
       }
     } catch (err) {
       console.error('Failed to load projects', err);
     }
-  }, [selectedProject]);
+  }, []);
 
+  const isRefreshingStatuses = useRef(false);
   const refreshStatuses = useCallback(async () => {
+    if (isRefreshingStatuses.current) return;
+    isRefreshingStatuses.current = true;
     try {
       if (window.deployHubAPI) {
         const [gh, vc, nl] = await Promise.all([
@@ -65,6 +69,8 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load CLI statuses', err);
+    } finally {
+      isRefreshingStatuses.current = false;
     }
   }, []);
 
