@@ -1,18 +1,20 @@
+// TypeScript type definitions for DeployHub IPC API and Domain Models
+
 export interface SensitiveFileWarning {
   path: string;
   reason: string;
   severity: 'warning' | 'critical';
 }
 
+export interface GitFileInfo {
+  path: string;
+  status: string; // e.g., 'M', '??', 'A', 'D'
+}
+
 export interface GitRemoteInfo {
   name: string;
   fetchUrl: string;
   pushUrl: string;
-}
-
-export interface GitFileInfo {
-  path: string;
-  status: string; // e.g., 'M', '??', 'A', 'D'
 }
 
 export interface FrameworkInfo {
@@ -54,6 +56,7 @@ export interface ProjectRecord {
   id: string;
   name: string;
   path: string;
+  customSlug?: string; // Shortest domain slug (e.g. "3d-engine")
   repoUrl?: string;
   remoteName?: string;
   branchName?: string;
@@ -61,6 +64,9 @@ export interface ProjectRecord {
   vercelProjectId?: string;
   vercelProjectName?: string;
   vercelProductionUrl?: string;
+  netlifySiteName?: string;
+  netlifyProductionUrl?: string;
+  githubPagesUrl?: string;
   projectRoot: string;
   framework?: string;
   productionBranch?: string;
@@ -116,6 +122,23 @@ export interface VercelStatus {
   error?: string;
 }
 
+export interface NetlifyStatus {
+  installed: boolean;
+  authenticated: boolean;
+  username?: string;
+  email?: string;
+  error?: string;
+}
+
+export interface GitHubPagesStatus {
+  enabled: boolean;
+  url?: string;
+  status?: string;
+  customDomain?: string;
+  sourceBranch?: string;
+  sourcePath?: string;
+}
+
 export interface VercelEnvVar {
   key: string;
   value: string;
@@ -167,6 +190,37 @@ export interface ActionResult<T = unknown> {
   };
 }
 
+export interface DeployResultItem {
+  platform: 'vercel' | 'netlify' | 'github-pages';
+  success: boolean;
+  url?: string; // shortest canonical domain (e.g. https://slug.vercel.app)
+  inspectUrl?: string;
+  error?: string;
+}
+
+export interface PipelineResult {
+  pushSuccess: boolean;
+  pushOutput?: string;
+  deploySuccess: boolean;
+  deployUrl?: string;
+  inspectUrl?: string;
+  error?: string;
+  results?: {
+    vercel?: DeployResultItem;
+    netlify?: DeployResultItem;
+    githubPages?: DeployResultItem;
+  };
+}
+
+export interface MultiDeployPipelineOptions {
+  folderPath: string;
+  remoteName?: string;
+  branchName?: string;
+  customSlug?: string;
+  targets: Array<'vercel' | 'netlify' | 'github-pages'>;
+  isProduction?: boolean;
+}
+
 // IPC Interface exposed via contextBridge
 export interface DeployHubAPI {
   // Folder & Inspection
@@ -191,7 +245,29 @@ export interface DeployHubAPI {
   // Vercel CLI Actions
   checkVercelStatus: () => Promise<VercelStatus>;
   linkVercelProject: (folderPath: string, config: VercelProjectConfig) => Promise<ActionResult<{ projectId: string; projectName: string }>>;
-  deployInitialVercel: (folderPath: string, isProduction: boolean) => Promise<ActionResult<{ url: string; inspectUrl?: string }>>;
+  deployInitialVercel: (folderPath: string, isProduction: boolean, customSlug?: string) => Promise<ActionResult<{ url: string; inspectUrl?: string }>>;
+  deployVercel: (folderPath: string, isProduction?: boolean, customSlug?: string) => Promise<ActionResult<{ url: string; inspectUrl?: string }>>;
+  switchVercelAccount: (scope: string) => Promise<ActionResult<void>>;
+  loginVercel: () => Promise<ActionResult<void>>;
+
+  // Netlify CLI Actions
+  checkNetlifyStatus: () => Promise<NetlifyStatus>;
+  loginNetlify: () => Promise<ActionResult<void>>;
+  deployNetlify: (folderPath: string, siteName?: string, isProduction?: boolean) => Promise<ActionResult<{ url: string; deployUrl?: string }>>;
+
+  // GitHub Pages Actions
+  checkGhPagesStatus: (folderPath: string) => Promise<GitHubPagesStatus>;
+  deployGhPages: (folderPath: string, branchName?: string) => Promise<ActionResult<{ url: string }>>;
+
+  // Automated Multi-Target Pipeline
+  pushAndDeploy: (
+    folderPath: string,
+    remoteName?: string,
+    branchName?: string,
+    isProduction?: boolean,
+    customSlug?: string,
+    targets?: Array<'vercel' | 'netlify' | 'github-pages'>
+  ) => Promise<ActionResult<PipelineResult>>;
   
   // Project Registry & Storage
   getProjects: () => Promise<ProjectRecord[]>;

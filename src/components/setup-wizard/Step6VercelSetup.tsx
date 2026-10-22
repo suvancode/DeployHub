@@ -43,7 +43,13 @@ export const Step6VercelSetup: React.FC<Step6Props> = ({
   loading,
   linkedProjectName,
 }) => {
-  const [projectName, setProjectName] = useState(defaultProjectName || inspection.folderName);
+  const initialName = (defaultProjectName || inspection.folderName)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const [projectName, setProjectName] = useState(initialName || 'my-project');
   const [projectRoot, setProjectRoot] = useState('.');
   const [framework, setFramework] = useState(inspection.framework?.id || 'vite-react');
   const [envVars, setEnvVars] = useState<VercelEnvVar[]>([]);

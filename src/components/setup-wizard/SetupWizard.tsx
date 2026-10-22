@@ -261,7 +261,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     }
   };
 
-  // Step 7: Initial Deploy
+  // Step 7: Initial Deploy & Pipeline
   const handleDeployInitial = async (isProduction: boolean) => {
     if (!inspection) return null;
     setLoading(true);
@@ -276,18 +276,53 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     }
   };
 
+  const handlePushAndDeploy = async (
+    isProduction: boolean,
+    customSlug?: string,
+    targets?: Array<'vercel' | 'netlify' | 'github-pages'>
+  ) => {
+    if (!inspection) return null;
+    setLoading(true);
+    try {
+      const res = await window.deployHubAPI.pushAndDeploy(
+        inspection.folderPath,
+        configuredRemote,
+        configuredBranch,
+        isProduction,
+        customSlug,
+        targets || ['vercel', 'netlify']
+      );
+      if (res.success && res.data) {
+        return res.data;
+      }
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Finish setup and save project
-  const handleFinish = async () => {
+  const handleFinish = async (urls?: {
+    vercelUrl?: string;
+    netlifyUrl?: string;
+    ghPagesUrl?: string;
+    slug?: string;
+  }) => {
     if (!inspection) return;
     const record: ProjectRecord = {
       id: projectId,
       name: projectName || inspection.folderName,
       path: inspection.folderPath,
+      customSlug: urls?.slug,
       repoUrl: configuredRepoUrl || undefined,
       remoteName: configuredRemote,
       branchName: configuredBranch,
       githubUser: githubStatus?.username,
-      vercelProjectName: linkedVercelProject || undefined,
+      vercelProjectName: linkedVercelProject || urls?.slug || undefined,
+      vercelProductionUrl: urls?.vercelUrl,
+      netlifySiteName: urls?.slug,
+      netlifyProductionUrl: urls?.netlifyUrl,
+      githubPagesUrl: urls?.ghPagesUrl,
       projectRoot: '.',
       framework: inspection.framework?.name,
       productionBranch: configuredBranch,
@@ -298,7 +333,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         name: 'Setup Wizard',
         status: 'success',
         timestamp: new Date().toISOString(),
-        message: 'Completed initial Git, GitHub and Vercel configuration.',
+        message: 'Completed initial Git, GitHub and deployment configuration.',
       },
     };
 
@@ -443,6 +478,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             branchName={configuredBranch}
             vercelProjectName={linkedVercelProject || projectName}
             onDeployInitial={handleDeployInitial}
+            onPushAndDeploy={handlePushAndDeploy}
             onFinish={handleFinish}
             loading={loading}
           />

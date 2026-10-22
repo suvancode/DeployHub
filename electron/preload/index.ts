@@ -32,8 +32,34 @@ const api: DeployHubAPI = {
   checkVercelStatus: () => ipcRenderer.invoke('check-vercel-status'),
   linkVercelProject: (folderPath: string, config: VercelProjectConfig) =>
     ipcRenderer.invoke('link-vercel-project', folderPath, config),
-  deployInitialVercel: (folderPath: string, isProduction: boolean) =>
-    ipcRenderer.invoke('deploy-initial-vercel', folderPath, isProduction),
+  deployInitialVercel: (folderPath: string, isProduction: boolean, customSlug?: string) =>
+    ipcRenderer.invoke('deploy-initial-vercel', folderPath, isProduction, customSlug),
+  deployVercel: (folderPath: string, isProduction?: boolean, customSlug?: string) =>
+    ipcRenderer.invoke('deploy-vercel', folderPath, isProduction, customSlug),
+  switchVercelAccount: (scope: string) =>
+    ipcRenderer.invoke('switch-vercel-account', scope),
+  loginVercel: () =>
+    ipcRenderer.invoke('login-vercel'),
+
+  checkNetlifyStatus: () => ipcRenderer.invoke('check-netlify-status'),
+  loginNetlify: () => ipcRenderer.invoke('login-netlify'),
+  deployNetlify: (folderPath: string, siteName?: string, isProduction?: boolean) =>
+    ipcRenderer.invoke('deploy-netlify', folderPath, siteName, isProduction),
+
+  checkGhPagesStatus: (folderPath: string) =>
+    ipcRenderer.invoke('check-gh-pages-status', folderPath),
+  deployGhPages: (folderPath: string, branchName?: string) =>
+    ipcRenderer.invoke('deploy-gh-pages', folderPath, branchName),
+
+  pushAndDeploy: (
+    folderPath: string,
+    remoteName?: string,
+    branchName?: string,
+    isProduction?: boolean,
+    customSlug?: string,
+    targets?: Array<'vercel' | 'netlify' | 'github-pages'>
+  ) =>
+    ipcRenderer.invoke('push-and-deploy', folderPath, remoteName, branchName, isProduction, customSlug, targets),
 
   getProjects: () => ipcRenderer.invoke('get-projects'),
   getProject: (id: string) => ipcRenderer.invoke('get-project', id),

@@ -4,6 +4,9 @@ import { scanProjectFolder } from './projectScanner';
 import { gitManager } from './gitManager';
 import { githubManager } from './githubManager';
 import { vercelManager } from './vercelManager';
+import { netlifyManager } from './netlifyManager';
+import { ghPagesManager } from './ghPagesManager';
+import { pushAndDeployPipeline } from './deploymentPipeline';
 import { configManager } from './configManager';
 import { openInTerminal } from './terminalHelper';
 import { logger } from './logger';
@@ -126,18 +129,75 @@ export function setupIpcHandlers() {
     return githubManager.connectRepository(folderPath, options);
   });
 
-  // Vercel Setup
+  // Vercel Setup & Automation Pipeline
   ipcMain.handle('check-vercel-status', async () => {
     return vercelManager.checkStatus();
+  });
+
+  ipcMain.handle('switch-vercel-account', async (_, scope: string) => {
+    return vercelManager.switchAccount(scope);
+  });
+
+  ipcMain.handle('login-vercel', async () => {
+    return vercelManager.loginAccount();
   });
 
   ipcMain.handle('link-vercel-project', async (_, folderPath: string, config: VercelProjectConfig) => {
     return vercelManager.linkProject(folderPath, config);
   });
 
-  ipcMain.handle('deploy-initial-vercel', async (_, folderPath: string, isProduction: boolean) => {
-    return vercelManager.deployInitial(folderPath, isProduction);
+  ipcMain.handle('deploy-initial-vercel', async (_, folderPath: string, isProduction: boolean, customSlug?: string) => {
+    return vercelManager.deployInitial(folderPath, isProduction, customSlug);
   });
+
+  ipcMain.handle('deploy-vercel', async (_, folderPath: string, isProduction?: boolean, customSlug?: string) => {
+    return vercelManager.deployInitial(folderPath, isProduction ?? true, customSlug);
+  });
+
+  // Netlify Setup & Actions
+  ipcMain.handle('check-netlify-status', async () => {
+    return netlifyManager.checkStatus();
+  });
+
+  ipcMain.handle('login-netlify', async () => {
+    return netlifyManager.loginAccount();
+  });
+
+  ipcMain.handle('deploy-netlify', async (_, folderPath: string, siteName?: string, isProduction?: boolean) => {
+    return netlifyManager.deploy(folderPath, { siteName, isProduction: isProduction ?? true });
+  });
+
+  // GitHub Pages Setup & Actions
+  ipcMain.handle('check-gh-pages-status', async (_, folderPath: string) => {
+    return ghPagesManager.checkStatus(folderPath);
+  });
+
+  ipcMain.handle('deploy-gh-pages', async (_, folderPath: string, branchName?: string) => {
+    return ghPagesManager.deploy(folderPath, branchName || 'main');
+  });
+
+  // Automated Multi-Platform Pipeline
+  ipcMain.handle(
+    'push-and-deploy',
+    async (
+      _,
+      folderPath: string,
+      remoteName?: string,
+      branchName?: string,
+      isProduction?: boolean,
+      customSlug?: string,
+      targets?: Array<'vercel' | 'netlify' | 'github-pages'>
+    ) => {
+      return pushAndDeployPipeline(
+        folderPath,
+        remoteName || 'origin',
+        branchName,
+        isProduction ?? true,
+        customSlug,
+        targets || ['vercel']
+      );
+    }
+  );
 
   // Project Registry Storage
   ipcMain.handle('get-projects', async () => {

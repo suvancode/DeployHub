@@ -28,18 +28,39 @@ export function runProcess(
 
     logger.debug('processRunner', `Executing: ${executable} ${args.join(' ')} (cwd: ${cwd || 'default'})`);
 
+    let cmd = executable;
+    if (process.platform === 'win32') {
+      if (cmd === 'npx') cmd = 'npx.cmd';
+      else if (cmd === 'npm') cmd = 'npm.cmd';
+      else if (cmd === 'vercel') cmd = 'vercel.cmd';
+      else if (cmd === 'netlify') cmd = 'netlify.cmd';
+    }
+
+    const isWindowsBatch =
+      process.platform === 'win32' &&
+      (cmd === 'npx' ||
+        cmd === 'npx.cmd' ||
+        cmd === 'npm' ||
+        cmd === 'npm.cmd' ||
+        cmd === 'vercel' ||
+        cmd === 'vercel.cmd' ||
+        cmd === 'netlify' ||
+        cmd === 'netlify.cmd' ||
+        cmd.toLowerCase().endsWith('.cmd') ||
+        cmd.toLowerCase().endsWith('.bat'));
+
     const spawnOptions: SpawnOptions = {
       cwd,
       env,
-      shell: false, // Critical security requirement: do NOT invoke shell
+      shell: isWindowsBatch,
       windowsHide: true,
     };
 
     let child;
     try {
-      child = spawn(executable, args, spawnOptions);
+      child = spawn(cmd, args, spawnOptions);
     } catch (err) {
-      logger.error('processRunner', `Failed to spawn ${executable}`, err);
+      logger.error('processRunner', `Failed to spawn ${cmd}`, err);
       return reject(err);
     }
 

@@ -9,42 +9,119 @@ import {
   GitBranch,
   Globe,
   ShieldCheck,
-  FileCode,
   RotateCw,
   FolderGit2,
   AlertTriangle,
   UploadCloud,
+  Rocket,
+  CheckCircle2,
+  Cloud,
+  FileCode,
+  Sparkles,
+  Layers,
 } from 'lucide-react';
-import { ProjectRecord } from '../../types/api';
+import {
+  ProjectRecord,
+  GitHubAccountStatus,
+  VercelStatus,
+  NetlifyStatus,
+  PipelineResult,
+} from '../../types/api';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 
 interface ProjectWorkspaceProps {
   project: ProjectRecord;
+  githubStatus?: GitHubAccountStatus | null;
+  vercelStatus?: VercelStatus | null;
+  netlifyStatus?: NetlifyStatus | null;
+  onRefreshStatuses?: () => void;
   onBack: () => void;
   onOpenFolder: (path: string) => void;
   onOpenTerminal: (path: string) => void;
   onOpenUrl: (url: string) => void;
   onReconfigure: (project: ProjectRecord) => void;
+  onSaveProject?: (project: ProjectRecord) => void;
 }
 
 export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   project,
+  githubStatus,
+  vercelStatus,
+  netlifyStatus,
+  onRefreshStatuses,
   onBack,
   onOpenFolder,
   onOpenTerminal,
   onOpenUrl,
   onReconfigure,
+  onSaveProject,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'git' | 'github' | 'vercel'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'git' | 'github' | 'vercel' | 'netlify' | 'gh-pages'>('overview');
   const [copied, setCopied] = useState(false);
+
+  // Shortest domain custom slug
+  const initialSlug =
+    project.customSlug ||
+    project.name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '') ||
+    'app';
+  const [customSlug, setCustomSlug] = useState(initialSlug);
+
+  // Multi-platform selection
+  const [selectedPlatforms, setSelectedPlatforms] = useState<{
+    vercel: boolean;
+    netlify: boolean;
+    githubPages: boolean;
+  }>({
+    vercel: true,
+    netlify: true,
+    githubPages: false,
+  });
+
+  // Automation states
   const [isPushing, setIsPushing] = useState(false);
+  const [isDeployingVercel, setIsDeployingVercel] = useState(false);
+  const [isDeployingNetlify, setIsDeployingNetlify] = useState(false);
+  const [isDeployingGhPages, setIsDeployingGhPages] = useState(false);
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false);
+  const [isProduction, setIsProduction] = useState(true);
+
+  // Status feedback
   const [pushStatus, setPushStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [deployFeedback, setDeployFeedback] = useState<{
+    platform: string;
+    success: boolean;
+    message: string;
+    url?: string;
+  } | null>(null);
+  const [pipelineResult, setPipelineResult] = useState<PipelineResult | null>(null);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
 
   const pushCommand = project.branchName
     ? `git push -u ${project.remoteName || 'origin'} ${project.branchName}`
     : 'git push';
 
+  // Helper to extract repo name from repoUrl
+  const repoName = project.repoUrl
+    ? project.repoUrl.replace(/https:\/\/github\.com\/[^/]+\//, '').replace(/\.git$/, '')
+    : project.name;
+  const ownerName = project.githubUser || githubStatus?.username || 'user';
+
+  // Shortest URLs preview
+  const vercelShortUrl = `https://${customSlug || 'app'}.vercel.app`;
+  const netlifyShortUrl = `https://${customSlug || 'app'}.netlify.app`;
+  const ghPagesShortUrl = `https://${ownerName.toLowerCase()}.github.io/${repoName}/`;
+
+  const togglePlatform = (p: 'vercel' | 'netlify' | 'githubPages') => {
+    setSelectedPlatforms((prev) => ({ ...prev, [p]: !prev[p] }));
+  };
+
+  // 1. Push code to GitHub
   const handlePush = async () => {
     setIsPushing(true);
     setPushStatus(null);
@@ -62,7 +139,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       } else {
         setPushStatus({
           success: false,
-          message: res.error?.why || res.error?.message || 'Git push failed.',
+          message: res.error?.why || res.error?.message || 'Git push rejected by remote.',
         });
       }
     } catch (e: unknown) {
@@ -72,13 +149,206 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     }
   };
 
-  const handleCopyPush = async () => {
+  // 2. Deploy to Vercel (standalone)
+  const handleDeployVercel = async () => {
+    setIsDeployingVercel(true);
+    setDeployFeedback(null);
     try {
-      await navigator.clipboard.writeText(pushCommand);
+      const res = await window.deployHubAPI.deployVercel(project.path, isProduction, customSlug);
+      if (res.success && res.data) {
+        const liveUrl = res.data.url;
+        setDeployFeedback({
+          platform: 'Vercel',
+          success: true,
+          message: `Live on Vercel: ${liveUrl}`,
+          url: liveUrl,
+        });
+
+        if (onSaveProject) {
+          onSaveProject({
+            ...project,
+            customSlug,
+            vercelProductionUrl: liveUrl,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } else {
+        setDeployFeedback({
+          platform: 'Vercel',
+          success: false,
+          message: res.error?.why || res.error?.message || 'Vercel deployment failed.',
+        });
+      }
+    } catch (e: unknown) {
+      setDeployFeedback({
+        platform: 'Vercel',
+        success: false,
+        message: String(e),
+      });
+    } finally {
+      setIsDeployingVercel(false);
+    }
+  };
+
+  // 3. Deploy to Netlify (standalone)
+  const handleDeployNetlify = async () => {
+    setIsDeployingNetlify(true);
+    setDeployFeedback(null);
+    try {
+      const res = await window.deployHubAPI.deployNetlify(project.path, customSlug, isProduction);
+      if (res.success && res.data) {
+        const liveUrl = res.data.url;
+        setDeployFeedback({
+          platform: 'Netlify',
+          success: true,
+          message: `Live on Netlify: ${liveUrl}`,
+          url: liveUrl,
+        });
+
+        if (onSaveProject) {
+          onSaveProject({
+            ...project,
+            customSlug,
+            netlifySiteName: customSlug,
+            netlifyProductionUrl: liveUrl,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } else {
+        setDeployFeedback({
+          platform: 'Netlify',
+          success: false,
+          message: res.error?.why || res.error?.message || 'Netlify deployment failed.',
+        });
+      }
+    } catch (e: unknown) {
+      setDeployFeedback({
+        platform: 'Netlify',
+        success: false,
+        message: String(e),
+      });
+    } finally {
+      setIsDeployingNetlify(false);
+    }
+  };
+
+  // 4. Deploy to GitHub Pages (standalone)
+  const handleDeployGhPages = async () => {
+    setIsDeployingGhPages(true);
+    setDeployFeedback(null);
+    try {
+      const res = await window.deployHubAPI.deployGhPages(project.path, project.branchName || 'main');
+      if (res.success && res.data) {
+        const liveUrl = res.data.url;
+        setDeployFeedback({
+          platform: 'GitHub Pages',
+          success: true,
+          message: `GitHub Pages enabled: ${liveUrl}`,
+          url: liveUrl,
+        });
+
+        if (onSaveProject) {
+          onSaveProject({
+            ...project,
+            githubPagesUrl: liveUrl,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } else {
+        setDeployFeedback({
+          platform: 'GitHub Pages',
+          success: false,
+          message: res.error?.why || res.error?.message || 'GitHub Pages configuration failed.',
+        });
+      }
+    } catch (e: unknown) {
+      setDeployFeedback({
+        platform: 'GitHub Pages',
+        success: false,
+        message: String(e),
+      });
+    } finally {
+      setIsDeployingGhPages(false);
+    }
+  };
+
+  // 5. Unified Automated Pipeline: Push & Deploy to All Selected Targets
+  const handlePushAndDeploy = async () => {
+    const targets: Array<'vercel' | 'netlify' | 'github-pages'> = [];
+    if (selectedPlatforms.vercel) targets.push('vercel');
+    if (selectedPlatforms.netlify) targets.push('netlify');
+    if (selectedPlatforms.githubPages) targets.push('github-pages');
+
+    if (targets.length === 0) {
+      setPipelineError('Please select at least one deployment platform (Vercel, Netlify, or GitHub Pages).');
+      return;
+    }
+
+    setIsPipelineRunning(true);
+    setPipelineError(null);
+    setPipelineResult(null);
+    setDeployFeedback(null);
+    setPushStatus(null);
+
+    try {
+      const res = await window.deployHubAPI.pushAndDeploy(
+        project.path,
+        project.remoteName || 'origin',
+        project.branchName || 'main',
+        isProduction,
+        customSlug,
+        targets
+      );
+
+      if (res.success && res.data) {
+        setPipelineResult(res.data);
+
+        // Update stored URLs in project record
+        const updated: ProjectRecord = {
+          ...project,
+          customSlug,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (res.data.results?.vercel?.url) {
+          updated.vercelProductionUrl = res.data.results.vercel.url;
+        }
+        if (res.data.results?.netlify?.url) {
+          updated.netlifyProductionUrl = res.data.results.netlify.url;
+          updated.netlifySiteName = customSlug;
+        }
+        if (res.data.results?.githubPages?.url) {
+          updated.githubPagesUrl = res.data.results.githubPages.url;
+        }
+
+        if (onSaveProject) {
+          onSaveProject(updated);
+        }
+      } else {
+        setPipelineError(res.error?.why || res.error?.message || 'Automation pipeline encountered an error.');
+        if (res.data) setPipelineResult(res.data);
+      }
+    } catch (e: unknown) {
+      setPipelineError(String(e));
+    } finally {
+      setIsPipelineRunning(false);
+    }
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // fallback
+    }
+  };
+
+  const handleSwitchGitHubUser = async (user: string) => {
+    if (window.deployHubAPI) {
+      await window.deployHubAPI.switchGitHubAccount(user);
+      if (onRefreshStatuses) onRefreshStatuses();
     }
   };
 
@@ -146,7 +416,18 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               onClick={() => onOpenUrl(project.vercelProductionUrl!)}
               icon={<Globe className="w-3.5 h-3.5" />}
             >
-              Site
+              Vercel
+            </Button>
+          )}
+
+          {project.netlifyProductionUrl && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onOpenUrl(project.netlifyProductionUrl!)}
+              icon={<Cloud className="w-3.5 h-3.5 text-teal-400" />}
+            >
+              Netlify
             </Button>
           )}
 
@@ -162,17 +443,19 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       </div>
 
       {/* Navigation tabs */}
-      <div className="flex border-b border-devtoys-border gap-1">
+      <div className="flex border-b border-devtoys-border gap-1 overflow-x-auto">
         {[
-          { id: 'overview', label: 'Overview' },
+          { id: 'overview', label: '⚡ Automation & Deployment Hub' },
           { id: 'git', label: 'Local Git' },
           { id: 'github', label: 'GitHub Repository' },
-          { id: 'vercel', label: 'Vercel Deployment' },
+          { id: 'vercel', label: 'Vercel' },
+          { id: 'netlify', label: 'Netlify' },
+          { id: 'gh-pages', label: 'GitHub Pages' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap -mb-px ${
               activeTab === tab.id
                 ? 'border-devtoys-accent text-devtoys-primary'
                 : 'border-transparent text-devtoys-muted hover:text-devtoys-secondary'
@@ -183,53 +466,412 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         ))}
       </div>
 
-      {/* Tab 1: Overview */}
+      {/* Tab 1: Overview & Automated Multi-Deploy Center */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
-          {/* Push Command / Auto Push Box */}
-          <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-devtoys-primary flex items-center gap-1.5">
-                <UploadCloud className="w-3.5 h-3.5 text-devtoys-accent" /> Publish Code to GitHub
-              </span>
-              <span className="text-[11px] text-devtoys-muted">Push your committed changes to remote repository</span>
+          {/* AUTOMATED MULTI-DEPLOYMENT HUB CARD */}
+          <div className="p-4 rounded-lg border border-devtoys-accent/30 bg-devtoys-card shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-devtoys-border/60 pb-3">
+              <div>
+                <span className="font-bold text-devtoys-primary flex items-center gap-2 text-xs">
+                  <Rocket className="w-4 h-4 text-devtoys-accent" />
+                  Automated Multi-Platform Deployment Center
+                </span>
+                <p className="text-[11px] text-devtoys-muted mt-0.5">
+                  Automate push to GitHub and deploy live to Vercel, Netlify, and GitHub Pages with shortest canonical domains.
+                </p>
+              </div>
+
+              {/* Multi-Account Indicator Badges */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {githubStatus?.authenticated && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-devtoys-sidebar border border-devtoys-border text-[11px]">
+                    <ShieldCheck className="w-3 h-3 text-devtoys-success shrink-0" />
+                    <span className="text-devtoys-muted">GH:</span>
+                    {githubStatus.accounts && githubStatus.accounts.length > 1 ? (
+                      <select
+                        value={githubStatus.username}
+                        onChange={(e) => handleSwitchGitHubUser(e.target.value)}
+                        className="bg-transparent text-devtoys-primary font-mono text-[11px] focus:outline-none cursor-pointer"
+                        title="Switch GitHub account"
+                      >
+                        {githubStatus.accounts.map((acc) => (
+                          <option key={acc} value={acc} className="bg-devtoys-card">
+                            @{acc}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="font-mono text-devtoys-primary">@{githubStatus.username}</span>
+                    )}
+                  </div>
+                )}
+
+                {vercelStatus?.authenticated && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-devtoys-sidebar border border-devtoys-border text-[11px]">
+                    <Globe className="w-3 h-3 text-devtoys-accent shrink-0" />
+                    <span className="text-devtoys-muted">Vercel:</span>
+                    <span className="font-mono text-devtoys-primary">{vercelStatus.username}</span>
+                  </div>
+                )}
+
+                {netlifyStatus?.authenticated && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-devtoys-sidebar border border-devtoys-border text-[11px]">
+                    <Cloud className="w-3 h-3 text-teal-400 shrink-0" />
+                    <span className="text-devtoys-muted">Netlify:</span>
+                    <span className="font-mono text-devtoys-primary">{netlifyStatus.username || 'Logged in'}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-7 px-3 rounded bg-devtoys-sidebar border border-devtoys-border font-mono text-xs text-devtoys-accent flex items-center select-all overflow-x-auto">
-                <span className="text-devtoys-muted mr-1.5 select-none">$</span>
-                <span>{pushCommand}</span>
+            {/* SECTION: SHORTEST DOMAIN SLUG CUSTOMIZER */}
+            <div className="p-3 rounded-md border border-devtoys-border bg-devtoys-sidebar space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold text-devtoys-primary flex items-center gap-1.5 text-xs">
+                    <Sparkles className="w-3.5 h-3.5 text-devtoys-accent" />
+                    Shortest Domain Slug / Custom Subdomain
+                  </span>
+                  <p className="text-[11px] text-devtoys-muted">
+                    Customize your subdomain slug to get the shortest possible live URLs on all platforms.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-devtoys-muted font-mono">Slug:</span>
+                  <input
+                    type="text"
+                    value={customSlug}
+                    onChange={(e) => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    placeholder="my-short-app"
+                    className="h-7 w-40 bg-devtoys-card border border-devtoys-border rounded px-2 text-xs font-mono text-devtoys-accent focus:outline-none focus:border-devtoys-accent"
+                  />
+                </div>
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handlePush}
-                loading={isPushing}
-                icon={<UploadCloud className="w-3.5 h-3.5" />}
-              >
-                Push Now
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleCopyPush}
-                icon={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              >
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onOpenTerminal(project.path)}
-                icon={<Terminal className="w-3.5 h-3.5" />}
-              >
-                Terminal
-              </Button>
+
+              {/* Real-time Shortest Domain Previews */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-devtoys-border/60 text-[11px]">
+                <div className="p-2 rounded bg-devtoys-card border border-devtoys-border flex items-center justify-between">
+                  <span className="text-devtoys-muted flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-devtoys-accent" /> Vercel:
+                  </span>
+                  <span className="font-mono text-devtoys-accent truncate font-medium">{vercelShortUrl}</span>
+                </div>
+
+                <div className="p-2 rounded bg-devtoys-card border border-devtoys-border flex items-center justify-between">
+                  <span className="text-devtoys-muted flex items-center gap-1">
+                    <Cloud className="w-3 h-3 text-teal-400" /> Netlify:
+                  </span>
+                  <span className="font-mono text-teal-400 truncate font-medium">{netlifyShortUrl}</span>
+                </div>
+
+                <div className="p-2 rounded bg-devtoys-card border border-devtoys-border flex items-center justify-between">
+                  <span className="text-devtoys-muted flex items-center gap-1">
+                    <FileCode className="w-3 h-3 text-devtoys-success" /> GH Pages:
+                  </span>
+                  <span className="font-mono text-devtoys-success truncate font-medium">{ghPagesShortUrl}</span>
+                </div>
+              </div>
             </div>
+
+            {/* PLATFORM SELECTION CHECKBOXES */}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-devtoys-sidebar/60 p-2.5 rounded-md border border-devtoys-border/60">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="font-semibold text-devtoys-primary">Target Platforms:</span>
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlatforms.vercel}
+                    onChange={() => togglePlatform('vercel')}
+                    className="rounded border-devtoys-border bg-devtoys-sidebar text-devtoys-accent focus:ring-0"
+                  />
+                  <Globe className="w-3.5 h-3.5 text-devtoys-accent" />
+                  <span>Vercel</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlatforms.netlify}
+                    onChange={() => togglePlatform('netlify')}
+                    className="rounded border-devtoys-border bg-devtoys-sidebar text-devtoys-accent focus:ring-0"
+                  />
+                  <Cloud className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Netlify</span>
+                </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlatforms.githubPages}
+                    onChange={() => togglePlatform('githubPages')}
+                    className="rounded border-devtoys-border bg-devtoys-sidebar text-devtoys-accent focus:ring-0"
+                  />
+                  <FileCode className="w-3.5 h-3.5 text-devtoys-success" />
+                  <span>GitHub Pages</span>
+                </label>
+              </div>
+
+              <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary text-[11px] select-none">
+                <input
+                  type="checkbox"
+                  checked={isProduction}
+                  onChange={(e) => setIsProduction(e.target.checked)}
+                  className="rounded border-devtoys-border bg-devtoys-sidebar text-devtoys-accent focus:ring-0"
+                />
+                <span>Production Mode (<code>--prod</code>)</span>
+              </label>
+            </div>
+
+            {/* PRIMARY AUTOMATION ACTION BAR */}
+            <div className="space-y-2">
+              {/* THE BIG ALL-IN-ONE BUTTON */}
+              <button
+                type="button"
+                onClick={handlePushAndDeploy}
+                disabled={isPipelineRunning || isPushing || isDeployingVercel || isDeployingNetlify || isDeployingGhPages}
+                className="w-full p-3.5 rounded-lg border-2 border-devtoys-accent bg-devtoys-accent/15 hover:bg-devtoys-accent/25 transition-all text-left disabled:opacity-50 group flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-md bg-devtoys-accent/20 border border-devtoys-accent/40 flex items-center justify-center text-devtoys-accent group-hover:scale-110 transition-transform">
+                    <Rocket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-devtoys-primary">
+                      {isPipelineRunning ? 'Running Automation Pipeline...' : '🚀 Push & Deploy to Selected Platforms at Once'}
+                    </div>
+                    <div className="text-[11px] text-devtoys-secondary">
+                      Automated pipeline: Git Push to GitHub &rarr; Live build & publish on{' '}
+                      {[
+                        selectedPlatforms.vercel && 'Vercel',
+                        selectedPlatforms.netlify && 'Netlify',
+                        selectedPlatforms.githubPages && 'GitHub Pages',
+                      ]
+                        .filter(Boolean)
+                        .join(' + ') || 'selected targets'}{' '}
+                      with shortest URLs!
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs font-bold text-devtoys-accent shrink-0 hidden sm:block">
+                  {isPipelineRunning ? 'Deploying...' : 'One-Click Deploy ⚡'}
+                </div>
+              </button>
+
+              {/* INDIVIDUAL QUICK ACTIONS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handlePush}
+                  loading={isPushing}
+                  disabled={isPipelineRunning}
+                  icon={<UploadCloud className="w-3.5 h-3.5" />}
+                >
+                  Push to GitHub
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDeployVercel}
+                  loading={isDeployingVercel}
+                  disabled={isPipelineRunning}
+                  icon={<Globe className="w-3.5 h-3.5" />}
+                >
+                  Deploy Vercel
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDeployNetlify}
+                  loading={isDeployingNetlify}
+                  disabled={isPipelineRunning}
+                  icon={<Cloud className="w-3.5 h-3.5 text-teal-400" />}
+                >
+                  Deploy Netlify
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDeployGhPages}
+                  loading={isDeployingGhPages}
+                  disabled={isPipelineRunning}
+                  icon={<FileCode className="w-3.5 h-3.5 text-devtoys-success" />}
+                >
+                  Deploy GH Pages
+                </Button>
+              </div>
+            </div>
+
+            {/* PIPELINE LIVE RESULTS & SHORT DOMAINS BANNER */}
+            {pipelineResult && (
+              <div className="p-3.5 rounded-lg border border-devtoys-success/40 bg-devtoys-success/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-devtoys-success flex items-center gap-1.5 text-xs">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Automation Pipeline Succeeded!
+                  </span>
+                  <span className="text-[11px] text-devtoys-muted">Code pushed & sites live</span>
+                </div>
+
+                {/* Grid of Shortest Deployed URLs */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  {/* Vercel Result */}
+                  {pipelineResult.results?.vercel && (
+                    <div className="p-2.5 rounded bg-devtoys-sidebar border border-devtoys-border space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-devtoys-primary flex items-center gap-1">
+                          <Globe className="w-3 h-3 text-devtoys-accent" /> Vercel
+                        </span>
+                        <Badge variant={pipelineResult.results.vercel.success ? 'success' : 'error'}>
+                          {pipelineResult.results.vercel.success ? 'Live' : 'Failed'}
+                        </Badge>
+                      </div>
+                      {pipelineResult.results.vercel.url ? (
+                        <div className="flex items-center justify-between gap-1 pt-1">
+                          <button
+                            onClick={() => onOpenUrl(pipelineResult.results!.vercel!.url!)}
+                            className="text-devtoys-accent hover:underline font-mono text-[11px] truncate text-left"
+                            title={pipelineResult.results.vercel.url}
+                          >
+                            {pipelineResult.results.vercel.url}
+                          </button>
+                          <button
+                            onClick={() => handleCopy(pipelineResult.results!.vercel!.url!)}
+                            className="p-1 hover:text-devtoys-primary text-devtoys-muted"
+                            title="Copy URL"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-devtoys-error truncate">
+                          {pipelineResult.results.vercel.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Netlify Result */}
+                  {pipelineResult.results?.netlify && (
+                    <div className="p-2.5 rounded bg-devtoys-sidebar border border-devtoys-border space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-devtoys-primary flex items-center gap-1">
+                          <Cloud className="w-3 h-3 text-teal-400" /> Netlify
+                        </span>
+                        <Badge variant={pipelineResult.results.netlify.success ? 'success' : 'error'}>
+                          {pipelineResult.results.netlify.success ? 'Live' : 'Failed'}
+                        </Badge>
+                      </div>
+                      {pipelineResult.results.netlify.url ? (
+                        <div className="flex items-center justify-between gap-1 pt-1">
+                          <button
+                            onClick={() => onOpenUrl(pipelineResult.results!.netlify!.url!)}
+                            className="text-teal-400 hover:underline font-mono text-[11px] truncate text-left"
+                            title={pipelineResult.results.netlify.url}
+                          >
+                            {pipelineResult.results.netlify.url}
+                          </button>
+                          <button
+                            onClick={() => handleCopy(pipelineResult.results!.netlify!.url!)}
+                            className="p-1 hover:text-devtoys-primary text-devtoys-muted"
+                            title="Copy URL"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-devtoys-error truncate">
+                          {pipelineResult.results.netlify.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* GitHub Pages Result */}
+                  {pipelineResult.results?.githubPages && (
+                    <div className="p-2.5 rounded bg-devtoys-sidebar border border-devtoys-border space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-devtoys-primary flex items-center gap-1">
+                          <FileCode className="w-3 h-3 text-devtoys-success" /> GitHub Pages
+                        </span>
+                        <Badge variant={pipelineResult.results.githubPages.success ? 'success' : 'error'}>
+                          {pipelineResult.results.githubPages.success ? 'Live' : 'Failed'}
+                        </Badge>
+                      </div>
+                      {pipelineResult.results.githubPages.url ? (
+                        <div className="flex items-center justify-between gap-1 pt-1">
+                          <button
+                            onClick={() => onOpenUrl(pipelineResult.results!.githubPages!.url!)}
+                            className="text-devtoys-success hover:underline font-mono text-[11px] truncate text-left"
+                            title={pipelineResult.results.githubPages.url}
+                          >
+                            {pipelineResult.results.githubPages.url}
+                          </button>
+                          <button
+                            onClick={() => handleCopy(pipelineResult.results!.githubPages!.url!)}
+                            className="p-1 hover:text-devtoys-primary text-devtoys-muted"
+                            title="Copy URL"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-devtoys-error truncate">
+                          {pipelineResult.results.githubPages.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {pipelineError && (
+              <div className="p-3 rounded-md border border-devtoys-error/40 bg-devtoys-error/10 text-devtoys-error flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold">Automation Pipeline Notice:</div>
+                  <div className="text-[11px] mt-0.5">{pipelineError}</div>
+                </div>
+              </div>
+            )}
+
+            {deployFeedback && (
+              <div
+                className={`p-3 rounded-md border text-xs space-y-1 ${
+                  deployFeedback.success
+                    ? 'border-devtoys-success/40 bg-devtoys-success/10 text-devtoys-success'
+                    : 'border-devtoys-error/40 bg-devtoys-error/10 text-devtoys-error'
+                }`}
+              >
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="flex items-center gap-1.5">
+                    {deployFeedback.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                    {deployFeedback.message}
+                  </span>
+                  {deployFeedback.url && (
+                    <button
+                      onClick={() => onOpenUrl(deployFeedback.url!)}
+                      className="text-devtoys-accent hover:underline flex items-center gap-1 font-mono text-[11px]"
+                    >
+                      <span>Open Site</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {pushStatus && (
               <div
-                className={`p-2 rounded text-[11px] border ${
+                className={`p-2.5 rounded text-[11px] border ${
                   pushStatus.success
                     ? 'border-devtoys-success/30 bg-devtoys-success/10 text-devtoys-success'
                     : 'border-devtoys-error/30 bg-devtoys-error/10 text-devtoys-error'
@@ -240,7 +882,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             )}
           </div>
 
-          {/* Properties Grid */}
+          {/* Properties Grid with All Live URLs */}
           <div className="border border-devtoys-border rounded-md bg-devtoys-card divide-y divide-devtoys-border/60">
             <div className="p-3 flex items-center justify-between">
               <span className="text-devtoys-muted">Local Directory</span>
@@ -269,27 +911,45 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               )}
             </div>
             <div className="p-3 flex items-center justify-between">
-              <span className="text-devtoys-muted">Verified GitHub Account</span>
-              <span className="text-devtoys-primary">
-                {project.githubUser ? `@${project.githubUser}` : '—'}
-              </span>
-            </div>
-            <div className="p-3 flex items-center justify-between">
-              <span className="text-devtoys-muted">Vercel Project</span>
-              <span className="text-devtoys-primary">{project.vercelProjectName || 'Not linked'}</span>
-            </div>
-            <div className="p-3 flex items-center justify-between">
-              <span className="text-devtoys-muted">Production URL</span>
+              <span className="text-devtoys-muted">Shortest Vercel URL</span>
               {project.vercelProductionUrl ? (
                 <button
                   onClick={() => onOpenUrl(project.vercelProductionUrl!)}
-                  className="text-devtoys-accent hover:underline flex items-center gap-1"
+                  className="text-devtoys-accent hover:underline flex items-center gap-1 font-mono font-medium"
                 >
                   <span>{project.vercelProductionUrl}</span>
                   <ExternalLink className="w-3 h-3" />
                 </button>
               ) : (
-                <span className="text-devtoys-muted italic">None yet</span>
+                <span className="text-devtoys-muted italic">Not deployed yet ({vercelShortUrl})</span>
+              )}
+            </div>
+            <div className="p-3 flex items-center justify-between">
+              <span className="text-devtoys-muted">Shortest Netlify URL</span>
+              {project.netlifyProductionUrl ? (
+                <button
+                  onClick={() => onOpenUrl(project.netlifyProductionUrl!)}
+                  className="text-teal-400 hover:underline flex items-center gap-1 font-mono font-medium"
+                >
+                  <span>{project.netlifyProductionUrl}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              ) : (
+                <span className="text-devtoys-muted italic">Not deployed yet ({netlifyShortUrl})</span>
+              )}
+            </div>
+            <div className="p-3 flex items-center justify-between">
+              <span className="text-devtoys-muted">GitHub Pages URL</span>
+              {project.githubPagesUrl ? (
+                <button
+                  onClick={() => onOpenUrl(project.githubPagesUrl!)}
+                  className="text-devtoys-success hover:underline flex items-center gap-1 font-mono font-medium"
+                >
+                  <span>{project.githubPagesUrl}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              ) : (
+                <span className="text-devtoys-muted italic">Not deployed yet ({ghPagesShortUrl})</span>
               )}
             </div>
           </div>
@@ -318,6 +978,26 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               <span className="text-devtoys-success font-medium">Upstream configured</span>
             </div>
           </div>
+
+          <div className="pt-2 flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handlePush}
+              loading={isPushing}
+              icon={<UploadCloud className="w-3.5 h-3.5" />}
+            >
+              Push to Remote
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onOpenTerminal(project.path)}
+              icon={<Terminal className="w-3.5 h-3.5" />}
+            >
+              Terminal
+            </Button>
+          </div>
         </div>
       )}
 
@@ -337,9 +1017,9 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               </div>
               <div className="flex justify-between py-1 border-b border-devtoys-border/60">
                 <span className="text-devtoys-muted">Owner Identity:</span>
-                <span>@{project.githubUser || 'Verified'}</span>
+                <span className="font-mono">@{project.githubUser || githubStatus?.username || 'Verified'}</span>
               </div>
-              <div className="pt-2">
+              <div className="pt-2 flex items-center gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -347,6 +1027,15 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   icon={<ExternalLink className="w-3.5 h-3.5" />}
                 >
                   Open on GitHub
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handlePush}
+                  loading={isPushing}
+                  icon={<UploadCloud className="w-3.5 h-3.5" />}
+                >
+                  Push Now
                 </Button>
               </div>
             </div>
@@ -368,19 +1057,19 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
           <div className="space-y-2 text-devtoys-secondary">
             <div className="flex justify-between py-1 border-b border-devtoys-border/60">
-              <span className="text-devtoys-muted">Project Name:</span>
-              <span className="text-devtoys-primary">{project.vercelProjectName || 'Unlinked'}</span>
+              <span className="text-devtoys-muted">Subdomain Slug:</span>
+              <span className="font-mono text-devtoys-accent">{customSlug}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-devtoys-border/60">
-              <span className="text-devtoys-muted">Production Branch:</span>
-              <span className="font-mono text-devtoys-primary">{project.productionBranch || project.branchName || 'main'}</span>
+              <span className="text-devtoys-muted">Shortest Canonical URL:</span>
+              <span className="font-mono text-devtoys-primary">{vercelShortUrl}</span>
             </div>
             <div className="flex justify-between py-1">
-              <span className="text-devtoys-muted">Live URL:</span>
+              <span className="text-devtoys-muted">Live Deployment:</span>
               {project.vercelProductionUrl ? (
                 <button
                   onClick={() => onOpenUrl(project.vercelProductionUrl!)}
-                  className="text-devtoys-accent hover:underline flex items-center gap-1"
+                  className="text-devtoys-accent hover:underline flex items-center gap-1 font-mono"
                 >
                   <span>{project.vercelProductionUrl}</span>
                   <ExternalLink className="w-3 h-3" />
@@ -389,6 +1078,112 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                 <span className="text-devtoys-muted italic">No deployment recorded</span>
               )}
             </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleDeployVercel}
+              loading={isDeployingVercel}
+              icon={<Globe className="w-3.5 h-3.5" />}
+            >
+              Deploy to Vercel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Netlify */}
+      {activeTab === 'netlify' && (
+        <div className="p-4 rounded-md border border-devtoys-border bg-devtoys-card space-y-3">
+          <div className="flex items-center gap-2 text-devtoys-primary font-semibold text-xs">
+            <Cloud className="w-4 h-4 text-teal-400" />
+            <span>Netlify Integration</span>
+          </div>
+
+          <div className="space-y-2 text-devtoys-secondary">
+            <div className="flex justify-between py-1 border-b border-devtoys-border/60">
+              <span className="text-devtoys-muted">Site Slug:</span>
+              <span className="font-mono text-teal-400">{customSlug}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-devtoys-border/60">
+              <span className="text-devtoys-muted">Shortest Canonical URL:</span>
+              <span className="font-mono text-devtoys-primary">{netlifyShortUrl}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-devtoys-muted">Live Deployment:</span>
+              {project.netlifyProductionUrl ? (
+                <button
+                  onClick={() => onOpenUrl(project.netlifyProductionUrl!)}
+                  className="text-teal-400 hover:underline flex items-center gap-1 font-mono"
+                >
+                  <span>{project.netlifyProductionUrl}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              ) : (
+                <span className="text-devtoys-muted italic">No deployment recorded</span>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleDeployNetlify}
+              loading={isDeployingNetlify}
+              icon={<Cloud className="w-3.5 h-3.5 text-teal-400" />}
+            >
+              Deploy to Netlify
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: GitHub Pages */}
+      {activeTab === 'gh-pages' && (
+        <div className="p-4 rounded-md border border-devtoys-border bg-devtoys-card space-y-3">
+          <div className="flex items-center gap-2 text-devtoys-primary font-semibold text-xs">
+            <FileCode className="w-4 h-4 text-devtoys-success" />
+            <span>GitHub Pages Integration</span>
+          </div>
+
+          <div className="space-y-2 text-devtoys-secondary">
+            <div className="flex justify-between py-1 border-b border-devtoys-border/60">
+              <span className="text-devtoys-muted">Repository:</span>
+              <span className="font-mono text-devtoys-primary">{ownerName}/{repoName}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-devtoys-border/60">
+              <span className="text-devtoys-muted">Pages URL:</span>
+              <span className="font-mono text-devtoys-success">{ghPagesShortUrl}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-devtoys-muted">Status:</span>
+              {project.githubPagesUrl ? (
+                <button
+                  onClick={() => onOpenUrl(project.githubPagesUrl!)}
+                  className="text-devtoys-success hover:underline flex items-center gap-1 font-mono"
+                >
+                  <span>{project.githubPagesUrl}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              ) : (
+                <span className="text-devtoys-muted italic">Not enabled yet</span>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleDeployGhPages}
+              loading={isDeployingGhPages}
+              icon={<FileCode className="w-3.5 h-3.5" />}
+            >
+              Enable / Deploy GitHub Pages
+            </Button>
           </div>
         </div>
       )}

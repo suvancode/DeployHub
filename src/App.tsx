@@ -3,6 +3,7 @@ import {
   ProjectRecord,
   GitHubAccountStatus,
   VercelStatus,
+  NetlifyStatus,
   LogEntry,
   AppSettings,
 } from './types/api';
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
   const [githubStatus, setGithubStatus] = useState<GitHubAccountStatus | null>(null);
   const [vercelStatus, setVercelStatus] = useState<VercelStatus | null>(null);
+  const [netlifyStatus, setNetlifyStatus] = useState<NetlifyStatus | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
     theme: 'dark',
@@ -52,12 +54,14 @@ export const App: React.FC = () => {
   const refreshStatuses = useCallback(async () => {
     try {
       if (window.deployHubAPI) {
-        const [gh, vc] = await Promise.all([
+        const [gh, vc, nl] = await Promise.all([
           window.deployHubAPI.checkGitHubStatus(),
           window.deployHubAPI.checkVercelStatus(),
+          window.deployHubAPI.checkNetlifyStatus(),
         ]);
         setGithubStatus(gh);
         setVercelStatus(vc);
+        setNetlifyStatus(nl);
       }
     } catch (err) {
       console.error('Failed to load CLI statuses', err);
@@ -125,6 +129,36 @@ export const App: React.FC = () => {
       await window.deployHubAPI.saveProject(project);
       setSelectedProject(project);
       await refreshProjects();
+    }
+  };
+
+  const handleSwitchGitHubAccount = async (username: string) => {
+    if (window.deployHubAPI) {
+      const res = await window.deployHubAPI.switchGitHubAccount(username);
+      if (res.success) {
+        await refreshStatuses();
+      }
+    }
+  };
+
+  const handleLoginGitHub = async () => {
+    if (window.deployHubAPI) {
+      await window.deployHubAPI.loginGitHub();
+      await refreshStatuses();
+    }
+  };
+
+  const handleLoginVercel = async () => {
+    if (window.deployHubAPI) {
+      await window.deployHubAPI.loginVercel();
+      await refreshStatuses();
+    }
+  };
+
+  const handleLoginNetlify = async () => {
+    if (window.deployHubAPI) {
+      await window.deployHubAPI.loginNetlify();
+      await refreshStatuses();
     }
   };
 
@@ -254,7 +288,12 @@ export const App: React.FC = () => {
             breadcrumb={getBreadcrumb()}
             githubStatus={githubStatus}
             vercelStatus={vercelStatus}
+            netlifyStatus={netlifyStatus}
             onRefreshStatus={refreshStatuses}
+            onSwitchGitHubAccount={handleSwitchGitHubAccount}
+            onLoginGitHub={handleLoginGitHub}
+            onLoginVercel={handleLoginVercel}
+            onLoginNetlify={handleLoginNetlify}
           />
 
           <main className="flex-1 overflow-y-auto">
@@ -263,6 +302,10 @@ export const App: React.FC = () => {
               selectedProject ? (
                 <ProjectWorkspace
                   project={selectedProject}
+                  githubStatus={githubStatus}
+                  vercelStatus={vercelStatus}
+                  netlifyStatus={netlifyStatus}
+                  onRefreshStatuses={refreshStatuses}
                   onBack={() => setSelectedProject(null)}
                   onOpenFolder={handleOpenFolder}
                   onOpenTerminal={handleOpenTerminal}
@@ -271,6 +314,7 @@ export const App: React.FC = () => {
                     setSelectedProject(p);
                     setCurrentTab('repo-setup');
                   }}
+                  onSaveProject={handleSaveProject}
                 />
               ) : (
                 <DashboardView
@@ -365,10 +409,15 @@ export const App: React.FC = () => {
                 settings={settings}
                 githubStatus={githubStatus}
                 vercelStatus={vercelStatus}
+                netlifyStatus={netlifyStatus}
                 onSaveSettings={handleSaveSettings}
                 onRefreshStatuses={refreshStatuses}
                 onExportRegistry={handleExportRegistry}
                 onImportRegistry={handleImportRegistry}
+                onSwitchGitHubAccount={handleSwitchGitHubAccount}
+                onLoginGitHub={handleLoginGitHub}
+                onLoginVercel={handleLoginVercel}
+                onLoginNetlify={handleLoginNetlify}
               />
             )}
           </main>
