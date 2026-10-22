@@ -102,6 +102,14 @@ export function setupIpcHandlers() {
     return githubManager.checkStatus();
   });
 
+  ipcMain.handle('switch-github-account', async (_, username: string) => {
+    return githubManager.switchAccount(username);
+  });
+
+  ipcMain.handle('login-github', async () => {
+    return githubManager.loginAccount();
+  });
+
   ipcMain.handle('list-github-repos', async () => {
     return githubManager.listUserRepositories();
   });

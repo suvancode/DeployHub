@@ -82,3 +82,77 @@ export function openInTerminal(folderPath: string): Promise<ActionResult<void>> 
     }
   });
 }
+
+export function openTerminalWithCommand(command: string, folderPath?: string): Promise<ActionResult<void>> {
+  return new Promise((resolve) => {
+    logger.info('terminalHelper', `Opening terminal with command: ${command}`);
+
+    const settings = configManager.getSettings();
+    const preferred = settings.preferredTerminal || 'powershell';
+    const cwd = folderPath || process.cwd();
+
+    let cmd: string;
+    let args: string[];
+
+    if (preferred === 'wt') {
+      cmd = 'wt';
+      args = ['-d', cwd, 'powershell', '-NoExit', '-Command', command];
+    } else if (preferred === 'pwsh') {
+      cmd = 'pwsh';
+      args = ['-NoExit', '-Command', `Set-Location -LiteralPath '${cwd}'; ${command}`];
+    } else if (preferred === 'cmd') {
+      cmd = 'cmd';
+      args = ['/K', `cd /d "${cwd}" && ${command}`];
+    } else {
+      cmd = 'powershell';
+      args = ['-NoExit', '-Command', `Set-Location -LiteralPath '${cwd}'; ${command}`];
+    }
+
+    try {
+      const child = spawn(cmd, args, {
+        detached: true,
+        stdio: 'ignore',
+        shell: true,
+      });
+
+      child.on('error', (err) => {
+        logger.warn('terminalHelper', `Failed to open terminal ${preferred}, falling back to powershell`, err);
+        try {
+          const fallback = spawn('powershell', ['-NoExit', '-Command', command], {
+            detached: true,
+            stdio: 'ignore',
+            shell: true,
+          });
+          fallback.unref();
+          resolve({ success: true });
+        } catch (fallbackErr: unknown) {
+          const msg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+          resolve({
+            success: false,
+            error: {
+              code: 'TERMINAL_ERROR',
+              message: 'Failed to open terminal window.',
+              why: msg,
+              modified: false,
+            },
+          });
+        }
+      });
+
+      child.unref();
+      resolve({ success: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error('terminalHelper', 'Terminal launch exception', err);
+      resolve({
+        success: false,
+        error: {
+          code: 'TERMINAL_ERROR',
+          message: 'Failed to open terminal.',
+          why: msg,
+          modified: false,
+        },
+      });
+    }
+  });
+}

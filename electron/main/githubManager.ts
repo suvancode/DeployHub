@@ -8,6 +8,7 @@ import {
   ActionResult,
 } from '../../src/types/api';
 import { gitManager } from './gitManager';
+import { openTerminalWithCommand } from './terminalHelper';
 
 export class GitHubManager {
   /**
@@ -41,26 +42,33 @@ export class GitHubManager {
       const combined = `${authRes.stdout}\n${authRes.stderr}`;
 
       if (combined.includes('Logged in to') || combined.includes('Active account: true')) {
-        // Fetch user info via gh api user
+        // Parse all accounts mentioned in gh auth status
+        const accountMatches = [...combined.matchAll(/account\s+([a-zA-Z0-9_\-]+)/gi)];
+        const parsedAccounts = Array.from(new Set(accountMatches.map((m) => m[1])));
+
+        // Fetch active user info via gh api user
+        let activeUsername = parsedAccounts[0];
+        let name: string | undefined;
+
         const userRes = await runProcess('gh', ['api', 'user']);
         if (userRes.code === 0) {
-          const userJson = JSON.parse(userRes.stdout);
-          return {
-            installed: true,
-            authenticated: true,
-            username: userJson.login,
-            name: userJson.name || userJson.login,
-          };
+          try {
+            const userJson = JSON.parse(userRes.stdout);
+            activeUsername = userJson.login;
+            name = userJson.name || userJson.login;
+          } catch {
+            // ignore JSON parse error
+          }
         }
 
-        // Fallback parse from auth status
-        const match = combined.match(/account\s+([a-zA-Z0-9_\-]+)/i);
-        const username = match ? match[1] : undefined;
+        const accounts = Array.from(new Set([activeUsername, ...parsedAccounts].filter(Boolean) as string[]));
 
         return {
           installed: true,
           authenticated: true,
-          username,
+          username: activeUsername,
+          name,
+          accounts,
         };
       }
 
@@ -77,6 +85,45 @@ export class GitHubManager {
         error: `Failed to verify GitHub authentication: ${msg}`,
       };
     }
+  }
+
+  /**
+   * Switches the active GitHub CLI account using `gh auth switch`.
+   */
+  async switchAccount(username: string): Promise<ActionResult<void>> {
+    logger.info('githubManager', `Switching GitHub CLI account to: ${username}`);
+    try {
+      const res = await runProcess('gh', ['auth', 'switch', '--hostname', 'github.com', '--user', username]);
+      if (res.code !== 0) {
+        return {
+          success: false,
+          error: {
+            code: 'GH_SWITCH_FAILED',
+            message: `Failed to switch GitHub account to @${username}: ${res.stderr || res.stdout}`,
+            modified: false,
+          },
+        };
+      }
+      return { success: true, data: undefined };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        error: {
+          code: 'GH_SWITCH_ERROR',
+          message: msg,
+          modified: false,
+        },
+      };
+    }
+  }
+
+  /**
+   * Launches `gh auth login` in a visible terminal window for authenticating another account.
+   */
+  async loginAccount(): Promise<ActionResult<void>> {
+    logger.info('githubManager', 'Launching gh auth login in terminal');
+    return openTerminalWithCommand('gh auth login');
   }
 
   /**

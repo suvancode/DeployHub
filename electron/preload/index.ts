@@ -19,6 +19,8 @@ const api: DeployHubAPI = {
     ipcRenderer.invoke('get-manual-push-command', folderPath, remoteName, branchName),
 
   checkGitHubStatus: () => ipcRenderer.invoke('check-github-status'),
+  switchGitHubAccount: (username: string) => ipcRenderer.invoke('switch-github-account', username),
+  loginGitHub: () => ipcRenderer.invoke('login-github'),
   listGitHubRepos: () => ipcRenderer.invoke('list-github-repos'),
   createGitHubRepo: (folderPath: string, options: CreateRepoOptions) =>
     ipcRenderer.invoke('create-github-repo', folderPath, options),

@@ -83,6 +83,7 @@ export interface GitHubAccountStatus {
   name?: string;
   protocol?: string;
   scopes?: string[];
+  accounts?: string[];
   error?: string;
 }
 
@@ -180,6 +181,8 @@ export interface DeployHubAPI {
   
   // GitHub CLI Actions
   checkGitHubStatus: () => Promise<GitHubAccountStatus>;
+  switchGitHubAccount: (username: string) => Promise<ActionResult<void>>;
+  loginGitHub: () => Promise<ActionResult<void>>;
   listGitHubRepos: () => Promise<ActionResult<GitHubRepoItem[]>>;
   createGitHubRepo: (folderPath: string, options: CreateRepoOptions) => Promise<ActionResult<{ repoUrl: string; remoteName: string }>>;
   connectGitHubRepo: (folderPath: string, options: ConnectRepoOptions) => Promise<ActionResult<{ repoUrl: string; remoteName: string }>>;
