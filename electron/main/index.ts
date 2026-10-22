@@ -1,15 +1,22 @@
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { setupIpcHandlers } from './ipc';
 import { logger } from './logger';
 
-// Process-level exception handling
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Process-level exception handling with full stack formatting
 process.on('uncaughtException', (error) => {
-  logger.error('main', 'Uncaught Exception', error);
+  const errMsg = error instanceof Error ? `${error.message}\n${error.stack}` : String(error);
+  logger.error('main', 'Uncaught Exception', errMsg);
 });
 
 process.on('unhandledRejection', (reason) => {
-  logger.error('main', 'Unhandled Rejection', reason);
+  const reasonMsg = reason instanceof Error ? `${reason.message}\n${reason.stack}` : String(reason);
+  logger.error('main', 'Unhandled Rejection', reasonMsg);
 });
 
 let mainWindow: BrowserWindow | null = null;
@@ -18,7 +25,15 @@ async function createWindow() {
   logger.init();
   logger.info('main', 'Starting DeployHub desktop application...');
 
-  const preloadPath = path.join(__dirname, '../preload/index.js');
+  const appPath = app.getAppPath();
+  logger.info('main', `App path resolved: ${appPath}`);
+
+  // Resolve preload path reliably
+  let preloadPath = path.join(appPath, 'dist-electron/preload/index.js');
+  if (!fs.existsSync(preloadPath)) {
+    preloadPath = path.join(__dirname, '../preload/index.js');
+  }
+  logger.info('main', `Preload path resolved: ${preloadPath} (exists: ${fs.existsSync(preloadPath)})`);
 
   mainWindow = new BrowserWindow({
     title: 'DeployHub',
@@ -32,7 +47,7 @@ async function createWindow() {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // needed for custom IPC preload
+      sandbox: false,
       webSecurity: true,
     },
   });
@@ -59,15 +74,22 @@ async function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
+    logger.info('main', 'Main window shown successfully.');
   });
 
   setupIpcHandlers();
 
   // Load URL or local index
   if (process.env.VITE_DEV_SERVER_URL) {
+    logger.info('main', `Loading dev server: ${process.env.VITE_DEV_SERVER_URL}`);
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    await mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+    let indexPath = path.join(appPath, 'dist/index.html');
+    if (!fs.existsSync(indexPath)) {
+      indexPath = path.join(__dirname, '../../dist/index.html');
+    }
+    logger.info('main', `Loading local HTML file: ${indexPath} (exists: ${fs.existsSync(indexPath)})`);
+    await mainWindow.loadFile(indexPath);
   }
 }
 

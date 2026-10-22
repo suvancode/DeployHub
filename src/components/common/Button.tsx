@@ -3,35 +3,36 @@ import { Loader2 } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   loading?: boolean;
   icon?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   children,
-  variant = 'primary',
-  size = 'md',
+  variant = 'secondary',
+  size = 'sm',
   loading = false,
   icon,
   className = '',
   disabled,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none';
+  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-100 focus:outline-none focus:ring-1 focus:ring-devtoys-accent disabled:opacity-50 disabled:cursor-not-allowed select-none border text-xs';
 
   const sizeStyles = {
-    sm: 'text-xs px-2.5 py-1.5 gap-1.5',
-    md: 'text-sm px-4 py-2 gap-2',
-    lg: 'text-base px-5 py-2.5 gap-2.5',
+    xs: 'h-6 px-2 text-2xs gap-1',
+    sm: 'h-7 px-2.5 text-xs gap-1.5',
+    md: 'h-8 px-3 text-xs gap-2',
+    lg: 'h-9 px-4 text-sm gap-2',
   };
 
   const variantStyles = {
-    primary: 'bg-emerald-600 hover:bg-emerald-500 text-white focus:ring-emerald-500 shadow-sm shadow-emerald-950/50',
-    secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 focus:ring-slate-500',
-    danger: 'bg-rose-600 hover:bg-rose-500 text-white focus:ring-rose-500 shadow-sm shadow-rose-950/50',
-    outline: 'bg-transparent hover:bg-slate-800/80 text-slate-300 border border-slate-700 focus:ring-slate-500',
-    ghost: 'bg-transparent hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 focus:ring-slate-500',
+    primary: 'bg-devtoys-accent hover:bg-devtoys-accentHover text-slate-900 border-devtoys-accent font-semibold shadow-none',
+    secondary: 'bg-devtoys-card hover:bg-devtoys-cardHover text-devtoys-primary border-devtoys-border',
+    outline: 'bg-transparent hover:bg-devtoys-card text-devtoys-secondary hover:text-devtoys-primary border-devtoys-border',
+    ghost: 'bg-transparent hover:bg-devtoys-cardHover text-devtoys-secondary hover:text-devtoys-primary border-transparent',
+    danger: 'bg-devtoys-error/15 hover:bg-devtoys-error/25 text-devtoys-error border-devtoys-error/30',
   };
 
   return (
@@ -40,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin text-current" /> : icon}
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-current" /> : icon}
       {children}
     </button>
   );

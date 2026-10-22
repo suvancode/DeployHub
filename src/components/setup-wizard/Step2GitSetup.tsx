@@ -4,7 +4,6 @@ import {
   ShieldCheck,
   FileCheck,
   CheckCircle,
-  AlertTriangle,
   ArrowRight,
   ArrowLeft,
   PlusCircle,
@@ -46,98 +45,73 @@ export const Step2GitSetup: React.FC<Step2Props> = ({
 
   const handleInit = async () => {
     const success = await onInitGit(initialBranch);
-    if (success) {
-      setInitSuccess(true);
-    }
+    if (success) setInitSuccess(true);
   };
 
   const handleApplyGitignore = async () => {
     const success = await onApplyGitignore(gitignoreContent);
-    if (success) {
-      setGitignoreSuccess(true);
-    }
+    if (success) setGitignoreSuccess(true);
   };
 
   const handleCreateCommit = async () => {
     const success = await onCreateInitialCommit(commitMessage);
-    if (success) {
-      setCommitSuccess(true);
-    }
+    if (success) setCommitSuccess(true);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5 text-xs">
       <div>
-        <h3 className="text-lg font-bold text-slate-100">Step 2: Git Setup Manager</h3>
-        <p className="text-xs text-slate-400 mt-1">
-          Configure Git safely without destructive history rewrites or silent overwrites.
+        <h3 className="font-semibold text-devtoys-primary">Step 2: Git Setup Manager</h3>
+        <p className="text-[11px] text-devtoys-muted">
+          Configure Git repository safely without rewriting history or overwriting remotes.
         </p>
       </div>
 
-      {/* Case A: Folder is already a Git repository */}
       {inspection.isGitRepo ? (
-        <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+        <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2">
+          <div className="flex items-center gap-2 text-devtoys-success font-semibold">
             <ShieldCheck className="w-4 h-4" />
             <span>Existing Git Repository Preserved</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            DeployHub respects your existing Git history. No commits will be rewritten, and existing remotes will never be replaced silently.
+          <p className="text-[11px] text-devtoys-muted leading-relaxed">
+            Existing Git history is preserved. No commits will be rewritten.
           </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+          <div className="flex gap-4 text-[11px] bg-devtoys-sidebar p-2 rounded border border-devtoys-border">
             <div>
-              <span className="text-slate-500">Active Branch:</span>{' '}
-              <span className="font-mono text-emerald-300 font-semibold">{inspection.currentBranch || 'main'}</span>
+              <span className="text-devtoys-muted">Branch: </span>
+              <span className="font-mono text-devtoys-primary font-semibold">{inspection.currentBranch || 'main'}</span>
             </div>
             <div>
-              <span className="text-slate-500">Existing Commits:</span>{' '}
-              <span className="text-slate-200">{inspection.commitCount}</span>
+              <span className="text-devtoys-muted">Commits: </span>
+              <span className="text-devtoys-secondary">{inspection.commitCount}</span>
             </div>
           </div>
-
-          {inspection.hasUncommittedChanges && (
-            <Alert variant="warning" title="Uncommitted Changes Detected">
-              You have {inspection.uncommittedFiles.length} uncommitted file(s). You can commit them manually using your terminal or keep working.
-            </Alert>
-          )}
         </div>
       ) : (
-        /* Case B: Initialize Git Repository */
-        <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
+        <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-              <GitBranch className="w-4 h-4 text-emerald-400" />
-              <span>Initialize Local Git Repository</span>
-            </div>
+            <span className="font-semibold text-devtoys-primary flex items-center gap-1.5">
+              <GitBranch className="w-3.5 h-3.5 text-devtoys-accent" /> Initialize Local Git Repository
+            </span>
             {initSuccess && (
-              <span className="text-xs text-emerald-400 flex items-center gap-1">
-                <CheckCircle className="w-3.5 h-3.5" /> Initialized
+              <span className="text-[11px] text-devtoys-success flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Initialized
               </span>
             )}
           </div>
 
           {!initSuccess ? (
-            <div className="space-y-3">
-              <p className="text-xs text-slate-400">
-                This project does not have Git initialized yet. Specify your primary branch name below:
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-48">
-                  <label className="text-[11px] text-slate-400 block mb-1">Initial Branch Name</label>
-                  <input
-                    type="text"
-                    value={initialBranch}
-                    onChange={(e) => setInitialBranch(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div className="pt-4">
-                  <Button variant="primary" size="sm" onClick={handleInit} loading={loading}>
-                    Initialize Git
-                  </Button>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={initialBranch}
+                onChange={(e) => setInitialBranch(e.target.value)}
+                placeholder="Initial branch (e.g. main)"
+                className="w-40 h-7 bg-devtoys-sidebar border border-devtoys-border rounded-md px-2.5 text-xs font-mono text-devtoys-primary focus:outline-none focus:border-devtoys-accent"
+              />
+              <Button variant="primary" size="sm" onClick={handleInit} loading={loading}>
+                Initialize Git
+              </Button>
             </div>
           ) : (
             <Alert variant="success" title="Git Initialized">
@@ -148,30 +122,26 @@ export const Step2GitSetup: React.FC<Step2Props> = ({
       )}
 
       {/* .gitignore Configuration */}
-      <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
+      <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-            <FileCheck className="w-4 h-4 text-sky-400" />
-            <span>.gitignore Configuration</span>
-          </div>
+          <span className="font-semibold text-devtoys-primary flex items-center gap-1.5">
+            <FileCheck className="w-3.5 h-3.5 text-devtoys-accent" /> .gitignore Configuration
+          </span>
           <button
             onClick={() => setShowGitignoreEditor(!showGitignoreEditor)}
-            className="text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+            className="text-[11px] text-devtoys-accent hover:underline"
           >
-            {showGitignoreEditor ? 'Hide Editor' : 'View / Edit Proposed .gitignore'}
+            {showGitignoreEditor ? 'Hide Editor' : 'Edit .gitignore'}
           </button>
         </div>
 
         {showGitignoreEditor && (
-          <div className="space-y-3">
-            <p className="text-xs text-slate-400">
-              Review and customize the proposed .gitignore before applying. Important: Secrets like <code className="text-amber-300">.env</code> must remain excluded!
-            </p>
+          <div className="space-y-2 pt-1">
             <textarea
               value={gitignoreContent}
               onChange={(e) => setGitignoreContent(e.target.value)}
-              rows={8}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 focus:outline-none focus:border-emerald-500 resize-none"
+              rows={6}
+              className="w-full bg-devtoys-sidebar border border-devtoys-border rounded-md p-2 font-mono text-xs text-devtoys-secondary focus:outline-none focus:border-devtoys-accent resize-none"
             />
             <Button
               variant="secondary"
@@ -180,58 +150,43 @@ export const Step2GitSetup: React.FC<Step2Props> = ({
               loading={loading}
               disabled={gitignoreSuccess}
             >
-              {gitignoreSuccess ? '✓ .gitignore Applied' : 'Save .gitignore'}
+              {gitignoreSuccess ? 'Saved' : 'Save .gitignore'}
             </Button>
           </div>
         )}
       </div>
 
-      {/* Initial Commit Workflow (Only if 0 commits) */}
+      {/* Optional Initial Commit */}
       {!inspection.hasCommits && !commitSuccess && (
-        <div className="p-5 rounded-2xl border border-emerald-800/40 bg-emerald-950/20 space-y-4">
-          <div className="flex items-center gap-2 text-emerald-300 font-semibold text-sm">
-            <PlusCircle className="w-4 h-4 text-emerald-400" />
+        <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2">
+          <div className="flex items-center gap-1.5 text-devtoys-primary font-semibold">
+            <PlusCircle className="w-3.5 h-3.5 text-devtoys-accent" />
             <span>Create Optional Initial Commit</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            GitHub requires at least one local commit before you can run <code className="text-emerald-300">git push</code>. You can create an initial commit now or create one manually later.
+          <p className="text-[11px] text-devtoys-muted leading-relaxed">
+            GitHub requires at least one commit before pushing. You can create one now:
           </p>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-[11px] text-slate-400 block mb-1">Commit Message</label>
-              <input
-                type="text"
-                value={commitMessage}
-                onChange={(e) => setCommitMessage(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleCreateCommit}
-              loading={loading}
-            >
-              Stage Safe Files & Commit
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={commitMessage}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              className="flex-1 h-7 bg-devtoys-sidebar border border-devtoys-border rounded-md px-2.5 text-xs text-devtoys-primary focus:outline-none focus:border-devtoys-accent"
+            />
+            <Button variant="primary" size="sm" onClick={handleCreateCommit} loading={loading}>
+              Commit
             </Button>
           </div>
         </div>
       )}
 
-      {commitSuccess && (
-        <Alert variant="success" title="Commit Ready">
-          Initial commit created successfully. You are ready to connect a GitHub repository.
-        </Alert>
-      )}
-
       {/* Navigation buttons */}
-      <div className="flex items-center justify-between pt-4">
-        <Button variant="ghost" size="md" onClick={onBack} icon={<ArrowLeft className="w-4 h-4" />}>
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="ghost" size="sm" onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>
           Back
         </Button>
-        <Button variant="primary" size="md" onClick={onNext} icon={<ArrowRight className="w-4 h-4" />}>
-          Continue to GitHub Account
+        <Button variant="primary" size="sm" onClick={onNext} icon={<ArrowRight className="w-3.5 h-3.5" />}>
+          Continue to GitHub User
         </Button>
       </div>
     </div>

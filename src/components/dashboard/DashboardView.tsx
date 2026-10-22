@@ -2,60 +2,58 @@ import React, { useState } from 'react';
 import {
   Plus,
   Search,
-  Filter,
+  LayoutGrid,
+  List,
+  RefreshCw,
   FolderPlus,
-  Download,
-  Upload,
-  Layers,
-  AlertCircle,
+  GitBranch,
+  Globe,
+  ExternalLink,
+  Folder,
+  Terminal,
+  Trash2,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { ProjectRecord } from '../../types/api';
-import { DashboardStats } from './DashboardStats';
 import { ProjectCard } from './ProjectCard';
 import { Button } from '../common/Button';
+import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
 
 interface DashboardViewProps {
   projects: ProjectRecord[];
   onStartNewSetup: () => void;
-  onResumeSetup: (project: ProjectRecord) => void;
+  onSelectProject: (project: ProjectRecord) => void;
   onOpenFolder: (path: string) => void;
   onOpenTerminal: (path: string) => void;
   onOpenUrl: (url: string) => void;
   onDeleteProject: (id: string) => void;
-  onExportRegistry: () => void;
-  onImportRegistry: () => void;
+  onRefresh: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   projects,
   onStartNewSetup,
-  onResumeSetup,
+  onSelectProject,
   onOpenFolder,
   onOpenTerminal,
   onOpenUrl,
   onDeleteProject,
-  onExportRegistry,
-  onImportRegistry,
+  onRefresh,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [deleteCandidate, setDeleteCandidate] = useState<{ id: string; name: string } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const filteredProjects = projects.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.path.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.repoUrl && p.repoUrl.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    if (!matchesSearch) return false;
-
-    if (filterStatus === 'completed') return p.setupStatus === 'completed';
-    if (filterStatus === 'pending') return p.setupStatus !== 'completed';
-    if (filterStatus === 'github') return !!p.repoUrl;
-    if (filterStatus === 'vercel') return !!p.vercelProjectName;
-
-    return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.path.toLowerCase().includes(q) ||
+      (p.repoUrl && p.repoUrl.toLowerCase().includes(q))
+    );
   });
 
   const confirmDelete = () => {
@@ -65,119 +63,233 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
+  const handleCopyPush = async (e: React.MouseEvent, project: ProjectRecord) => {
+    e.stopPropagation();
+    const cmd = project.branchName
+      ? `git push -u ${project.remoteName || 'origin'} ${project.branchName}`
+      : 'git push';
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setCopiedId(project.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // fallback
+    }
+  };
+
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Top action bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-100">Project Overview</h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Manage your Git-configured and Vercel-linked repositories locally.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExportRegistry}
-            icon={<Download className="w-3.5 h-3.5" />}
-          >
-            Export
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onImportRegistry}
-            icon={<Upload className="w-3.5 h-3.5" />}
-          >
-            Import
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={onStartNewSetup}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            Configure New Project
-          </Button>
-        </div>
-      </div>
-
-      {/* Metrics Bar */}
-      <DashboardStats projects={projects} />
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+    <div className="p-4 space-y-4 max-w-7xl mx-auto text-xs">
+      {/* Top Action & Filter Toolbar */}
+      <div className="flex items-center justify-between gap-3 border-b border-devtoys-border pb-3">
+        {/* Search */}
+        <div className="relative w-64 sm:w-72">
+          <Search className="w-3.5 h-3.5 text-devtoys-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects by name, path, repo..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            placeholder="Search projects by name, path..."
+            className="w-full h-7 bg-devtoys-card border border-devtoys-border rounded-md pl-8 pr-2.5 text-xs text-devtoys-primary placeholder:text-devtoys-muted focus:outline-none focus:border-devtoys-accent"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-3.5 h-3.5 text-slate-500" />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+        {/* Actions & View Switcher */}
+        <div className="flex items-center gap-2">
+          {/* Grid / List Switcher */}
+          <div className="flex rounded-md border border-devtoys-border bg-devtoys-card p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1 rounded transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-devtoys-sidebar text-devtoys-accent'
+                  : 'text-devtoys-muted hover:text-devtoys-primary'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`p-1 rounded transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-devtoys-sidebar text-devtoys-accent'
+                  : 'text-devtoys-muted hover:text-devtoys-primary'
+              }`}
+              title="List View"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <Button variant="secondary" size="sm" onClick={onRefresh} icon={<RefreshCw className="w-3 h-3" />}>
+            Refresh
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onStartNewSetup}
+            icon={<Plus className="w-3.5 h-3.5" />}
           >
-            <option value="all">All Projects ({projects.length})</option>
-            <option value="completed">Completed Setup</option>
-            <option value="pending">Awaiting Setup</option>
-            <option value="github">Connected to GitHub</option>
-            <option value="vercel">Linked to Vercel</option>
-          </select>
+            Add Project
+          </Button>
         </div>
       </div>
 
-      {/* Projects Grid or Empty State */}
+      {/* Content: Grid, List or Empty State */}
       {filteredProjects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredProjects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onOpenFolder={onOpenFolder}
-              onOpenTerminal={onOpenTerminal}
-              onOpenUrl={onOpenUrl}
-              onResumeSetup={onResumeSetup}
-              onDeleteProject={(id, name) => setDeleteCandidate({ id, name })}
-            />
-          ))}
-        </div>
-      ) : projects.length === 0 ? (
-        /* Zero state */
-        <div className="border border-dashed border-slate-800 rounded-2xl p-12 text-center bg-slate-900/20">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 text-emerald-400">
-            <FolderPlus className="w-8 h-8" />
+        viewMode === 'grid' ? (
+          /* Grid View (DevToys compact tool cards) */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onSelectProject={onSelectProject}
+                onOpenFolder={onOpenFolder}
+                onOpenTerminal={onOpenTerminal}
+                onOpenUrl={onOpenUrl}
+                onDeleteProject={(id, name) => setDeleteCandidate({ id, name })}
+              />
+            ))}
           </div>
-          <h3 className="text-lg font-semibold text-slate-200">No Projects Configured Yet</h3>
-          <p className="text-sm text-slate-400 max-w-md mx-auto mt-2 leading-relaxed">
-            Select a project folder on your computer to inspect its Git state, link a GitHub repository, and connect Vercel in just a few clicks.
+        ) : (
+          /* List View (Compact table layout) */
+          <div className="border border-devtoys-border rounded-md overflow-hidden bg-devtoys-card">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-devtoys-sidebar text-devtoys-muted border-b border-devtoys-border text-[11px] uppercase tracking-wider font-semibold">
+                <tr>
+                  <th className="py-2 px-3">Project</th>
+                  <th className="py-2 px-3">Branch</th>
+                  <th className="py-2 px-3">GitHub</th>
+                  <th className="py-2 px-3">Vercel</th>
+                  <th className="py-2 px-3">Status</th>
+                  <th className="py-2 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-devtoys-border/60">
+                {filteredProjects.map((project) => (
+                  <tr
+                    key={project.id}
+                    onClick={() => onSelectProject(project)}
+                    className="hover:bg-devtoys-cardHover transition-colors cursor-pointer"
+                  >
+                    <td className="py-2.5 px-3">
+                      <div className="font-semibold text-devtoys-primary">{project.name}</div>
+                      <div className="text-[11px] text-devtoys-muted font-mono truncate max-w-xs">{project.path}</div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-devtoys-secondary">
+                      {project.branchName || 'main'}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {project.repoUrl ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenUrl(project.repoUrl!);
+                          }}
+                          className="text-devtoys-accent hover:underline flex items-center gap-1 font-mono text-[11px]"
+                        >
+                          <span>{project.repoUrl.replace('https://github.com/', '')}</span>
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        </button>
+                      ) : (
+                        <span className="text-devtoys-muted italic">Unlinked</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-devtoys-secondary">
+                      {project.vercelProductionUrl ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenUrl(project.vercelProductionUrl!);
+                          }}
+                          className="text-devtoys-accent hover:underline flex items-center gap-1 text-[11px]"
+                        >
+                          <span>{project.vercelProjectName}</span>
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        </button>
+                      ) : (
+                        project.vercelProjectName || <span className="text-devtoys-muted italic">Unlinked</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {project.setupStatus === 'completed' ? (
+                        <Badge variant="success">Active</Badge>
+                      ) : project.setupStatus === 'vercel_linked' ? (
+                        <Badge variant="accent">Vercel</Badge>
+                      ) : (
+                        <Badge variant="warning">Pending</Badge>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => handleCopyPush(e, project)}
+                          className="p-1 rounded text-devtoys-secondary hover:text-devtoys-primary hover:bg-devtoys-border/50"
+                          title="Copy git push"
+                        >
+                          {copiedId === project.id ? (
+                            <Check className="w-3.5 h-3.5 text-devtoys-success" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => onOpenFolder(project.path)}
+                          className="p-1 rounded text-devtoys-secondary hover:text-devtoys-primary hover:bg-devtoys-border/50"
+                          title="Open Folder"
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onOpenTerminal(project.path)}
+                          className="p-1 rounded text-devtoys-secondary hover:text-devtoys-primary hover:bg-devtoys-border/50"
+                          title="Open Terminal"
+                        >
+                          <Terminal className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteCandidate({ id: project.id, name: project.name })}
+                          className="p-1 rounded text-devtoys-muted hover:text-devtoys-error hover:bg-devtoys-error/10"
+                          title="Remove from DeployHub"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : projects.length === 0 ? (
+        /* DevToys-style compact empty state */
+        <div className="border border-dashed border-devtoys-border rounded-md p-8 text-center bg-devtoys-card/30 max-w-lg mx-auto my-8">
+          <div className="w-10 h-10 rounded-md bg-devtoys-card border border-devtoys-border flex items-center justify-center mx-auto mb-3 text-devtoys-accent">
+            <FolderPlus className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-semibold text-devtoys-primary">No Projects Configured Yet</h3>
+          <p className="text-xs text-devtoys-muted max-w-sm mx-auto mt-1 leading-relaxed">
+            Select a project folder to inspect its Git state, link a GitHub repository, and connect Vercel.
           </p>
-          <div className="mt-6 flex justify-center">
+          <div className="mt-4 flex justify-center">
             <Button
               variant="primary"
-              size="lg"
+              size="sm"
               onClick={onStartNewSetup}
-              icon={<Plus className="w-4 h-4" />}
+              icon={<Plus className="w-3.5 h-3.5" />}
             >
               Select Project Folder
             </Button>
           </div>
         </div>
       ) : (
-        /* Filter returned empty */
-        <div className="border border-slate-800 rounded-2xl p-10 text-center bg-slate-900/30">
-          <Layers className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-          <h4 className="text-sm font-medium text-slate-300">No matching projects found</h4>
-          <p className="text-xs text-slate-500 mt-1">Try clearing your search query or filter.</p>
+        <div className="p-6 text-center text-devtoys-muted text-xs">
+          No projects matching &quot;{searchQuery}&quot;
         </div>
       )}
 
@@ -188,22 +300,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         title="Remove Project from DeployHub"
         maxWidth="md"
       >
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-amber-200 text-xs">
-            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-amber-100">Safe Removal:</span> This will only remove{' '}
-              <strong>{deleteCandidate?.name}</strong> from DeployHub&apos;s local registry. Your local code files,
-              Git repository, GitHub repository, and Vercel project will <strong>never be deleted</strong>.
-            </div>
-          </div>
+        <div className="space-y-3">
+          <p className="text-xs text-devtoys-secondary leading-relaxed">
+            Remove <strong>{deleteCandidate?.name}</strong> from DeployHub&apos;s local registry?
+            Your local files, Git repository, GitHub repo, and Vercel project will <strong>never be deleted</strong>.
+          </p>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setDeleteCandidate(null)}>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteCandidate(null)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={confirmDelete}>
-              Remove from Registry
+            <Button variant="danger" size="sm" onClick={confirmDelete}>
+              Remove
             </Button>
           </div>
         </div>

@@ -4,16 +4,11 @@ import {
   Terminal,
   Copy,
   Check,
-  GitBranch,
   ArrowRight,
   ArrowLeft,
-  CheckCircle2,
-  ExternalLink,
-  Info,
 } from 'lucide-react';
 import { ManualPushInfo } from '../../types/api';
 import { Button } from '../common/Button';
-import { Alert } from '../common/Alert';
 
 interface Step5Props {
   pushInfo: ManualPushInfo;
@@ -37,118 +32,97 @@ export const Step5ManualPush: React.FC<Step5Props> = ({
     try {
       await navigator.clipboard.writeText(pushInfo.command);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // fallback
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5 text-xs">
       <div>
-        <h3 className="text-lg font-bold text-slate-100">Step 5: Manual Git Push Verification</h3>
-        <p className="text-xs text-slate-400 mt-1">
+        <h3 className="font-semibold text-devtoys-primary">Step 5: Manual Git Push Verification</h3>
+        <p className="text-[11px] text-devtoys-muted">
           DeployHub follows a strict security policy: code is <strong>never pushed automatically</strong>.
         </p>
       </div>
 
-      {/* Security Rule Guarantee */}
-      <div className="p-4 rounded-xl border border-emerald-800/60 bg-emerald-950/20 text-xs text-emerald-200/95 flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+      {/* Manual Push Banner */}
+      <div className="p-3 rounded-md border border-devtoys-accent/30 bg-devtoys-accent/10 flex items-start gap-2 text-devtoys-primary text-xs">
+        <ShieldAlert className="w-4 h-4 text-devtoys-accent shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong className="text-emerald-300">Why Manual Push?</strong> Automatic or background pushing can accidentally publish unintended commits, private keys, or break remote tracking branches. You remain in total control of your GitHub repository.
+          <strong className="text-devtoys-accent">Manual Action Required:</strong> Run the command below in your terminal. You maintain full control over what and when to publish.
         </div>
       </div>
 
-      {/* Primary Push Command Card */}
-      <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
-            {pushInfo.isInitialPush ? 'Initial Push Command' : 'Push Command'}
-          </span>
-          <span className="text-xs text-slate-400 font-mono">
-            Branch: <strong className="text-emerald-400">{pushInfo.branch}</strong> → Remote: <strong className="text-emerald-400">{pushInfo.remoteName}</strong>
+      {/* Command Block */}
+      <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="font-semibold text-devtoys-primary">Push Command</span>
+          <span className="text-devtoys-muted font-mono">
+            {pushInfo.remoteName}/{pushInfo.branch}
           </span>
         </div>
 
-        {/* Command block with copy button */}
-        <div className="relative group">
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-base text-emerald-400 flex items-center justify-between shadow-inner">
-            <div className="flex items-center gap-2 select-all overflow-x-auto">
-              <span className="text-slate-600 select-none">$</span>
-              <span>{pushInfo.command}</span>
-            </div>
-            <button
-              onClick={handleCopy}
-              className="ml-3 shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span className="text-emerald-400">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-7 px-3 rounded bg-devtoys-sidebar border border-devtoys-border font-mono text-xs text-devtoys-accent flex items-center select-all">
+            <span className="text-devtoys-muted mr-1.5 select-none">$</span>
+            <span>{pushInfo.command}</span>
           </div>
-        </div>
-
-        <p className="text-xs text-slate-400 leading-relaxed">
-          {pushInfo.explanation}
-        </p>
-
-        {/* Action: Open Terminal */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleCopy}
+            icon={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
           <Button
             variant="secondary"
-            size="md"
+            size="sm"
             onClick={() => onOpenTerminal(projectPath)}
-            icon={<Terminal className="w-4 h-4" />}
-            className="w-full sm:w-auto"
+            icon={<Terminal className="w-3.5 h-3.5" />}
           >
-            Open Project in Terminal
+            Terminal
           </Button>
-          <span className="text-xs text-slate-500">
-            Click to launch your terminal directly in this directory and paste the command.
-          </span>
         </div>
+
+        <p className="text-[11px] text-devtoys-muted leading-relaxed">
+          {pushInfo.explanation}
+        </p>
       </div>
 
-      {/* Manual Checkbox / Confirmation */}
-      <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40">
-        <label className="flex items-start gap-3 cursor-pointer select-none">
+      {/* Confirmation Checkbox */}
+      <div className="p-3 rounded-md border border-devtoys-border bg-devtoys-card">
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={userConfirmedPushed}
             onChange={(e) => setUserConfirmedPushed(e.target.checked)}
-            className="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 bg-slate-950 border-slate-700"
+            className="mt-0.5 rounded text-devtoys-accent focus:ring-devtoys-accent"
           />
-          <div className="text-xs text-slate-300">
-            <span className="font-semibold text-slate-100">
-              I have executed the push command (or will push before Vercel deploy)
+          <div className="text-[11px] text-devtoys-secondary">
+            <span className="font-semibold text-devtoys-primary">
+              I have run the push command (or will push before Vercel deploy)
             </span>
-            <p className="text-slate-400 mt-0.5 leading-relaxed">
-              Once your commits are on GitHub, Vercel will be able to access the repository and set up automatic deployments for all future pushes.
-            </p>
+            <div className="text-devtoys-muted mt-0.5">
+              Once pushed to GitHub, Vercel will be able to detect commits and configure builds.
+            </div>
           </div>
         </label>
       </div>
 
       {/* Navigation buttons */}
-      <div className="flex items-center justify-between pt-4">
-        <Button variant="ghost" size="md" onClick={onBack} icon={<ArrowLeft className="w-4 h-4" />}>
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="ghost" size="sm" onClick={onBack} icon={<ArrowLeft className="w-3.5 h-3.5" />}>
           Back
         </Button>
         <Button
           variant="primary"
-          size="md"
+          size="sm"
           onClick={onNext}
           disabled={!userConfirmedPushed}
-          icon={<ArrowRight className="w-4 h-4" />}
+          icon={<ArrowRight className="w-3.5 h-3.5" />}
         >
           Proceed to Vercel Setup
         </Button>

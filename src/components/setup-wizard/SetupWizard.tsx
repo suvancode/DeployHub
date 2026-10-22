@@ -54,7 +54,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
   // Wizard state
   const [inspection, setInspection] = useState<ProjectInspection | null>(null);
-  const [projectId, setProjectId] = useState<string>(initialProject?.id || `proj_${Date.now()}`);
+  const [projectId] = useState<string>(initialProject?.id || `proj_${Date.now()}`);
   const [projectName, setProjectName] = useState<string>(initialProject?.name || '');
   const [configuredRepoUrl, setConfiguredRepoUrl] = useState<string | null>(initialProject?.repoUrl || null);
   const [configuredRemote, setConfiguredRemote] = useState<string>(initialProject?.remoteName || 'origin');
@@ -65,13 +65,13 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   );
 
   const steps = [
-    { num: 1, label: 'Folder & Scan', icon: <FolderOpen className="w-3.5 h-3.5" /> },
-    { num: 2, label: 'Git Setup', icon: <GitBranch className="w-3.5 h-3.5" /> },
-    { num: 3, label: 'GitHub Account', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
-    { num: 4, label: 'Repository', icon: <GitPullRequest className="w-3.5 h-3.5" /> },
-    { num: 5, label: 'Manual Push', icon: <Terminal className="w-3.5 h-3.5" /> },
-    { num: 6, label: 'Vercel Setup', icon: <Globe className="w-3.5 h-3.5" /> },
-    { num: 7, label: 'Summary', icon: <Sparkles className="w-3.5 h-3.5" /> },
+    { num: 1, label: '1. Scan', icon: <FolderOpen className="w-3 h-3" /> },
+    { num: 2, label: '2. Git', icon: <GitBranch className="w-3 h-3" /> },
+    { num: 3, label: '3. GitHub User', icon: <ShieldCheck className="w-3 h-3" /> },
+    { num: 4, label: '4. Repository', icon: <GitPullRequest className="w-3 h-3" /> },
+    { num: 5, label: '5. Manual Push', icon: <Terminal className="w-3 h-3" /> },
+    { num: 6, label: '6. Vercel', icon: <Globe className="w-3 h-3" /> },
+    { num: 7, label: '7. Summary', icon: <Sparkles className="w-3 h-3" /> },
   ];
 
   // Step 1: Folder Selection & Inspection
@@ -277,52 +277,52 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 max-w-4xl mx-auto space-y-4 text-xs">
       {/* Wizard Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div className="flex items-center justify-between border-b border-devtoys-border pb-3">
         <div>
-          <span className="text-xs uppercase font-mono tracking-wider text-emerald-400 font-semibold">
-            Project Onboarding Wizard
-          </span>
-          <h2 className="text-xl font-bold text-slate-100">
-            {inspection ? `Configuring: ${inspection.folderName}` : 'Configure Project'}
+          <h2 className="text-sm font-bold text-devtoys-primary">
+            {inspection ? `Setup: ${inspection.folderName}` : 'Repository Setup'}
           </h2>
+          <p className="text-[11px] text-devtoys-muted">
+            Configure local Git repository, GitHub integration, and Vercel once per project.
+          </p>
         </div>
         <button
           onClick={onCloseWizard}
-          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          title="Exit Wizard"
+          className="p-1 rounded text-devtoys-muted hover:text-devtoys-primary hover:bg-devtoys-card transition-colors"
+          title="Exit Setup"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Breadcrumb Steps Stepper */}
-      <div className="flex items-center justify-between overflow-x-auto py-2 gap-2 border-b border-slate-800/80">
+      {/* Compact DevToys Stepper */}
+      <div className="flex items-center justify-between border-b border-devtoys-border pb-2 gap-1 overflow-x-auto">
         {steps.map((s) => {
           const isDone = currentStep > s.num;
           const isCurrent = currentStep === s.num;
           return (
             <div
               key={s.num}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium whitespace-nowrap transition-colors ${
                 isCurrent
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold'
+                  ? 'bg-devtoys-card text-devtoys-accent font-semibold border border-devtoys-border'
                   : isDone
-                  ? 'text-slate-400 hover:text-slate-200'
-                  : 'text-slate-600'
+                  ? 'text-devtoys-secondary hover:text-devtoys-primary'
+                  : 'text-devtoys-muted opacity-60'
               }`}
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
                   isCurrent
-                    ? 'bg-emerald-500 text-slate-950'
+                    ? 'bg-devtoys-accent text-slate-900 font-bold'
                     : isDone
-                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                    : 'bg-slate-900 text-slate-600 border border-slate-800'
+                    ? 'bg-devtoys-border text-devtoys-success'
+                    : 'bg-devtoys-card text-devtoys-muted'
                 }`}
               >
-                {isDone ? <Check className="w-3 h-3" /> : s.num}
+                {isDone ? <Check className="w-2.5 h-2.5" /> : s.num}
               </div>
               <span>{s.label}</span>
             </div>
@@ -330,8 +330,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         })}
       </div>
 
-      {/* Step Components */}
-      <div className="pt-2">
+      {/* Active Step Container */}
+      <div className="pt-1">
         {currentStep === 1 && (
           <Step1FolderSelect
             inspection={inspection}

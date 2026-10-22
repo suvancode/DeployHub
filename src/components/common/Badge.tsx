@@ -2,34 +2,34 @@ import React from 'react';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple';
-  size?: 'sm' | 'md';
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent';
+  size?: 'xs' | 'sm';
   icon?: React.ReactNode;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
   children,
   variant = 'neutral',
-  size = 'md',
+  size = 'xs',
   icon,
 }) => {
   const sizeStyles = {
-    sm: 'text-xs px-2 py-0.5 gap-1',
-    md: 'text-xs px-2.5 py-1 gap-1.5',
+    xs: 'text-[11px] px-1.5 py-0.5 gap-1',
+    sm: 'text-xs px-2 py-0.5 gap-1.5',
   };
 
   const variantStyles = {
-    success: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
-    warning: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-    danger: 'bg-rose-500/10 text-rose-400 border border-rose-500/20',
-    info: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
-    purple: 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20',
-    neutral: 'bg-slate-800 text-slate-300 border border-slate-700/80',
+    success: 'bg-devtoys-success/15 text-devtoys-success border border-devtoys-success/25',
+    warning: 'bg-devtoys-warning/15 text-devtoys-warning border border-devtoys-warning/25',
+    danger: 'bg-devtoys-error/15 text-devtoys-error border border-devtoys-error/25',
+    info: 'bg-devtoys-accent/15 text-devtoys-accent border border-devtoys-accent/25',
+    accent: 'bg-devtoys-accent/15 text-devtoys-accent border border-devtoys-accent/25',
+    neutral: 'bg-devtoys-card text-devtoys-secondary border border-devtoys-border',
   };
 
   return (
     <span
-      className={`inline-flex items-center font-medium rounded-full ${sizeStyles[size]} ${variantStyles[variant]}`}
+      className={`inline-flex items-center font-medium rounded ${sizeStyles[size]} ${variantStyles[variant]}`}
     >
       {icon}
       {children}

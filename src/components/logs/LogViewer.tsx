@@ -60,45 +60,62 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     }
   };
 
-  const getLevelIcon = (level: LogEntry['level']) => {
+  const getLevelBadge = (level: LogEntry['level']) => {
     switch (level) {
       case 'error':
-        return <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />;
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-devtoys-error/15 text-devtoys-error font-medium">
+            <AlertCircle className="w-2.5 h-2.5" /> ERROR
+          </span>
+        );
       case 'warn':
-        return <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />;
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-devtoys-warning/15 text-devtoys-warning font-medium">
+            <AlertTriangle className="w-2.5 h-2.5" /> WARN
+          </span>
+        );
       case 'debug':
-        return <Bug className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />;
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-devtoys-border text-devtoys-muted font-medium">
+            <Bug className="w-2.5 h-2.5" /> DEBUG
+          </span>
+        );
       default:
-        return <Info className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />;
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-devtoys-accent/15 text-devtoys-accent font-medium">
+            <Info className="w-2.5 h-2.5" /> INFO
+          </span>
+        );
     }
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="p-4 space-y-3 max-w-5xl mx-auto text-xs">
+      {/* Top Header */}
+      <div className="flex items-center justify-between border-b border-devtoys-border pb-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-emerald-400" /> Activity & Diagnostics Logs
+          <h2 className="text-sm font-bold text-devtoys-primary flex items-center gap-2">
+            <FileText className="w-4 h-4 text-devtoys-accent" /> Activity & Diagnostics Logs
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-devtoys-muted mt-0.5">
             Structured local logs with credentials and token redaction.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleCopyLogs}
-            icon={copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            icon={copied ? <Check className="w-3 h-3 text-devtoys-success" /> : <Copy className="w-3 h-3" />}
           >
-            {copied ? 'Copied' : 'Copy Logs'}
+            {copied ? 'Copied' : 'Copy'}
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={onRefreshLogs}
-            icon={<RefreshCw className="w-3.5 h-3.5" />}
+            icon={<RefreshCw className="w-3 h-3" />}
           >
             Refresh
           </Button>
@@ -106,7 +123,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
             variant="ghost"
             size="sm"
             onClick={onClearLogs}
-            icon={<Trash2 className="w-3.5 h-3.5" />}
+            icon={<Trash2 className="w-3 h-3" />}
           >
             Clear
           </Button>
@@ -114,56 +131,54 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative w-64">
+          <Search className="w-3.5 h-3.5 text-devtoys-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search logs..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full h-7 bg-devtoys-card border border-devtoys-border rounded-md pl-8 pr-2.5 text-xs text-devtoys-primary placeholder:text-devtoys-muted focus:outline-none focus:border-devtoys-accent"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
-          >
-            <option value="all">All Levels ({logs.length})</option>
-            <option value="info">Info</option>
-            <option value="warn">Warnings</option>
-            <option value="error">Errors</option>
-            <option value="debug">Debug</option>
-          </select>
-        </div>
+        <select
+          value={levelFilter}
+          onChange={(e) => setLevelFilter(e.target.value)}
+          className="h-7 bg-devtoys-card border border-devtoys-border rounded-md px-2.5 text-xs text-devtoys-primary focus:outline-none focus:border-devtoys-accent"
+        >
+          <option value="all">All Levels ({logs.length})</option>
+          <option value="info">Info</option>
+          <option value="warn">Warnings</option>
+          <option value="error">Errors</option>
+          <option value="debug">Debug</option>
+        </select>
       </div>
 
       {/* Log Console Window */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl overflow-hidden font-mono text-xs">
-        <div className="p-3 bg-slate-900/60 border-b border-slate-800 text-slate-400 flex items-center justify-between text-[11px]">
-          <span>DeployHub Local Diagnostic Log Stream</span>
-          <span>{filteredLogs.length} entries shown</span>
+      <div className="rounded-md border border-devtoys-border bg-devtoys-sidebar overflow-hidden font-mono text-[11px]">
+        <div className="p-2 bg-devtoys-card/60 border-b border-devtoys-border text-devtoys-muted flex items-center justify-between text-[11px]">
+          <span>Log Output Stream</span>
+          <span>{filteredLogs.length} events</span>
         </div>
 
-        <div className="p-4 max-h-[550px] overflow-y-auto space-y-2 select-text">
+        <div className="p-2 max-h-[500px] overflow-y-auto space-y-1 select-text">
           {filteredLogs.length > 0 ? (
             filteredLogs.map((entry, idx) => (
               <div
                 key={idx}
-                className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-900/60 transition-colors border border-transparent hover:border-slate-800"
+                className="flex items-start gap-2 p-1.5 rounded hover:bg-devtoys-card/50 transition-colors"
               >
-                {getLevelIcon(entry.level)}
-                <span className="text-slate-500 select-none text-[11px] shrink-0">
+                <span className="text-devtoys-muted select-none text-[10px] shrink-0 pt-0.5">
                   {entry.timestamp.substring(11, 19)}
                 </span>
-                <span className="text-indigo-400 font-semibold shrink-0">[{entry.module}]</span>
-                <div className="flex-1 break-all text-slate-300">
+                <span className="shrink-0">{getLevelBadge(entry.level)}</span>
+                <span className="text-devtoys-accent font-semibold shrink-0">[{entry.module}]</span>
+                <div className="flex-1 break-all text-devtoys-secondary">
                   <span>{entry.message}</span>
                   {entry.details !== undefined && (
-                    <pre className="mt-1 p-2 rounded bg-slate-900/90 text-[11px] text-slate-400 overflow-x-auto">
+                    <pre className="mt-1 p-1.5 rounded bg-devtoys-main text-[10px] text-devtoys-muted overflow-x-auto">
                       {typeof entry.details === 'string'
                         ? entry.details
                         : JSON.stringify(entry.details, null, 2)}
@@ -173,7 +188,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
               </div>
             ))
           ) : (
-            <div className="text-center py-12 text-slate-600">No logs found.</div>
+            <div className="text-center py-8 text-devtoys-muted">No log entries found.</div>
           )}
         </div>
       </div>

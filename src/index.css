@@ -3,12 +3,28 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --devtoys-main: #1F2023;
+    --devtoys-sidebar: #191A1D;
+    --devtoys-content: #232428;
+    --devtoys-card: #2D2E33;
+    --devtoys-card-hover: #383A40;
+    --devtoys-border: #414249;
+    --devtoys-primary: #F2F2F3;
+    --devtoys-secondary: #B7B8C0;
+    --devtoys-muted: #858792;
+    --devtoys-accent: #55B8E8;
+  }
+
   body {
     user-select: none;
     -webkit-font-smoothing: antialiased;
+    background-color: #1F2023;
+    color: #F2F2F3;
+    font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   }
   
-  /* Custom scrollbar for modern developer tooling */
+  /* Compact Native Windows / DevToys Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -17,10 +33,14 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.2);
+    background: #414249;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.4);
+    background: #555761;
+  }
+
+  input, select, textarea {
+    color-scheme: dark;
   }
 }

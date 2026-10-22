@@ -1,89 +1,83 @@
 import React from 'react';
-import { GitBranch, Globe, RefreshCw, Settings, ShieldCheck, AlertCircle } from 'lucide-react';
+import { GitBranch, Globe, RefreshCw, ShieldCheck, AlertCircle } from 'lucide-react';
 import { GitHubAccountStatus, VercelStatus } from '../../types/api';
 
 interface HeaderProps {
   title: string;
-  subtitle?: string;
+  breadcrumb?: string;
   githubStatus: GitHubAccountStatus | null;
   vercelStatus: VercelStatus | null;
   onRefreshStatus: () => void;
-  onOpenSettings: () => void;
+  actions?: React.ReactNode;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   title,
-  subtitle,
+  breadcrumb,
   githubStatus,
   vercelStatus,
   onRefreshStatus,
-  onOpenSettings,
+  actions,
 }) => {
   return (
-    <header className="h-16 px-6 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+    <header className="h-11 px-4 bg-devtoys-content border-b border-devtoys-border flex items-center justify-between shrink-0 select-none z-10">
+      {/* Title & Breadcrumb */}
+      <div className="flex items-center gap-2 min-w-0">
+        {breadcrumb && (
+          <>
+            <span className="text-xs text-devtoys-muted">{breadcrumb}</span>
+            <span className="text-devtoys-muted text-xs">/</span>
+          </>
+        )}
+        <h2 className="text-xs font-semibold text-devtoys-primary truncate tracking-tight">
           {title}
-        </h1>
-        {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </h2>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* GitHub CLI Status Indicator */}
+      {/* Contextual actions & CLI Status */}
+      <div className="flex items-center gap-2">
+        {actions && <div className="flex items-center gap-1.5 mr-2">{actions}</div>}
+
+        {/* GitHub CLI indicator */}
         <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] font-medium transition-colors ${
             githubStatus?.authenticated
-              ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
-              : 'bg-amber-950/40 border-amber-800/60 text-amber-300'
+              ? 'bg-devtoys-card border-devtoys-border text-devtoys-secondary'
+              : 'bg-devtoys-warning/10 border-devtoys-warning/30 text-devtoys-warning'
           }`}
-          title={githubStatus?.error || (githubStatus?.authenticated ? `Logged in as ${githubStatus.username}` : 'Not logged in')}
+          title={githubStatus?.error || (githubStatus?.authenticated ? `GitHub user: @${githubStatus.username}` : 'GitHub CLI not logged in')}
         >
-          <GitBranch className="w-3.5 h-3.5" />
-          <span>
-            {githubStatus?.authenticated ? `@${githubStatus.username}` : 'GitHub: Not Logged In'}
-          </span>
+          <GitBranch className="w-3 h-3 text-devtoys-accent" />
+          <span>{githubStatus?.authenticated ? `@${githubStatus.username}` : 'gh: Logged out'}</span>
           {githubStatus?.authenticated ? (
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <ShieldCheck className="w-3 h-3 text-devtoys-success" />
           ) : (
-            <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+            <AlertCircle className="w-3 h-3 text-devtoys-warning" />
           )}
         </div>
 
-        {/* Vercel CLI Status Indicator */}
+        {/* Vercel CLI indicator */}
         <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] font-medium transition-colors ${
             vercelStatus?.authenticated
-              ? 'bg-sky-950/40 border-sky-800/60 text-sky-300'
-              : 'bg-slate-800/60 border-slate-700 text-slate-400'
+              ? 'bg-devtoys-card border-devtoys-border text-devtoys-secondary'
+              : 'bg-devtoys-card border-devtoys-border text-devtoys-muted'
           }`}
           title={vercelStatus?.error || (vercelStatus?.authenticated ? `Vercel user: ${vercelStatus.username}` : 'Vercel CLI not linked')}
         >
-          <Globe className="w-3.5 h-3.5" />
+          <Globe className="w-3 h-3 text-devtoys-accent" />
           <span>
-            {vercelStatus?.authenticated
-              ? `Vercel: ${vercelStatus.username}`
-              : vercelStatus?.installed
-              ? 'Vercel: Logged Out'
-              : 'Vercel CLI: Missing'}
+            {vercelStatus?.authenticated ? vercelStatus.username : vercelStatus?.installed ? 'Vercel Ready' : 'Vercel Missing'}
           </span>
         </div>
 
-        {/* Refresh CLI Status */}
+        {/* Quick Refresh Status */}
         <button
           onClick={onRefreshStatus}
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-colors"
-          title="Refresh CLI statuses"
+          className="p-1 rounded text-devtoys-muted hover:text-devtoys-primary hover:bg-devtoys-card transition-colors"
+          title="Refresh CLI tool statuses"
         >
-          <RefreshCw className="w-4 h-4" />
-        </button>
-
-        {/* Settings Button */}
-        <button
-          onClick={onOpenSettings}
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-colors"
-          title="Settings"
-        >
-          <Settings className="w-4 h-4" />
+          <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
     </header>
