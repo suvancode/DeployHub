@@ -10,6 +10,7 @@ import { pushAndDeployPipeline } from './deploymentPipeline';
 import { configManager } from './configManager';
 import { openInTerminal } from './terminalHelper';
 import { logger } from './logger';
+import { diagnoseGitError } from './errorDiagnostics';
 import {
   ProjectRecord,
   CreateRepoOptions,
@@ -102,6 +103,14 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('push-repo', async (_, folderPath: string, remoteName?: string, branchName?: string) => {
     return gitManager.pushRepo(folderPath, remoteName, branchName);
+  });
+
+  ipcMain.handle('fix-git-remote', async (_, folderPath: string, remoteName: string, fixedUrl: string) => {
+    return gitManager.fixRemote(folderPath, remoteName, fixedUrl);
+  });
+
+  ipcMain.handle('diagnose-git-error', async (_, rawError: string, currentRemoteUrl?: string) => {
+    return diagnoseGitError(rawError, currentRemoteUrl);
   });
 
   // GitHub Setup

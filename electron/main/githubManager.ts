@@ -9,6 +9,7 @@ import {
 } from '../../src/types/api';
 import { gitManager } from './gitManager';
 import { openTerminalWithCommand } from './terminalHelper';
+import { sanitizeRepoName, sanitizeRemoteUrl } from './errorDiagnostics';
 
 export class GitHubManager {
   /**
@@ -190,8 +191,9 @@ export class GitHubManager {
     folderPath: string,
     options: CreateRepoOptions
   ): Promise<ActionResult<{ repoUrl: string; remoteName: string }>> {
-    const { name, description, isPrivate, remoteName = 'origin' } = options;
-    logger.info('githubManager', `Creating GitHub repository: ${name} (private: ${isPrivate})`);
+    const safeName = sanitizeRepoName(options.name);
+    const { description, isPrivate, remoteName = 'origin' } = options;
+    logger.info('githubManager', `Creating GitHub repository: ${safeName} (original: ${options.name}, private: ${isPrivate})`);
 
     try {
       // 1. Get authenticated username
@@ -209,7 +211,7 @@ export class GitHubManager {
         };
       }
 
-      const fullRepoPath = `${status.username}/${name}`;
+      const fullRepoPath = `${status.username}/${safeName}`;
 
       // 2. Conflict check: check if repo already exists
       const checkRes = await runProcess('gh', ['repo', 'view', fullRepoPath]);
@@ -230,7 +232,7 @@ export class GitHubManager {
       const args = [
         'repo',
         'create',
-        name,
+        safeName,
         isPrivate ? '--private' : '--public',
       ];
       if (description && description.trim()) {
@@ -248,11 +250,14 @@ export class GitHubManager {
       if (viewRes.code === 0) {
         try {
           const parsed = JSON.parse(viewRes.stdout);
-          if (parsed.url) repoUrl = parsed.url;
+          if (parsed.url) {
+            repoUrl = parsed.url.endsWith('.git') ? parsed.url : `${parsed.url}.git`;
+          }
         } catch {
           // fallback to standard format
         }
       }
+      repoUrl = sanitizeRemoteUrl(repoUrl);
 
       // 4. Configure local Git remote safely (allow update if user explicitly created repo)
       const remoteResult = await gitManager.setRemote(folderPath, remoteName, repoUrl, true);
@@ -302,17 +307,18 @@ export class GitHubManager {
     options: ConnectRepoOptions
   ): Promise<ActionResult<{ repoUrl: string; remoteName: string }>> {
     const { repoUrl, remoteName = 'origin' } = options;
-    logger.info('githubManager', `Connecting to existing repository: ${repoUrl}`);
+    const sanitizedUrl = sanitizeRemoteUrl(repoUrl);
+    logger.info('githubManager', `Connecting to existing repository: ${sanitizedUrl}`);
 
     try {
       // 1. Verify repository access using gh repo view
-      const viewRes = await runProcess('gh', ['repo', 'view', repoUrl]);
+      const viewRes = await runProcess('gh', ['repo', 'view', sanitizedUrl]);
       if (viewRes.code !== 0) {
         return {
           success: false,
           error: {
             code: 'REPO_ACCESS_DENIED',
-            message: `Cannot access GitHub repository "${repoUrl}".`,
+            message: `Cannot access GitHub repository "${sanitizedUrl}".`,
             why: viewRes.stderr || 'Repository does not exist or your authenticated account does not have access.',
             modified: false,
             nextStep: 'Verify the repository URL and check that your GitHub account has read/write permissions.',
@@ -321,7 +327,7 @@ export class GitHubManager {
       }
 
       // 2. Configure local Git remote safely (allow update if user explicitly connected repo)
-      const remoteResult = await gitManager.setRemote(folderPath, remoteName, repoUrl, true);
+      const remoteResult = await gitManager.setRemote(folderPath, remoteName, sanitizedUrl, true);
       if (!remoteResult.success) {
         return {
           success: false,
@@ -332,7 +338,7 @@ export class GitHubManager {
       return {
         success: true,
         data: {
-          repoUrl,
+          repoUrl: sanitizedUrl,
           remoteName,
         },
       };

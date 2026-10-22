@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { runProcess } from './processRunner';
 import { logger } from './logger';
-import { ActionResult, ManualPushInfo } from '../../src/types/api';
+import { ActionResult, ManualPushInfo, PushRepoResult } from '../../src/types/api';
+import { diagnoseGitError, sanitizeRemoteUrl } from './errorDiagnostics';
 
 export class GitManager {
   /**
@@ -283,13 +284,26 @@ export class GitManager {
   }
 
   /**
+   * Fixes or updates a malformed remote URL directly.
+   */
+  async fixRemote(
+    folderPath: string,
+    remoteName: string = 'origin',
+    fixedUrl: string
+  ): Promise<ActionResult<void>> {
+    logger.info('gitManager', `Fixing remote "${remoteName}" to "${fixedUrl}" in ${folderPath}`);
+    return this.setRemote(folderPath, remoteName, fixedUrl, true);
+  }
+
+  /**
    * Pushes the repository commits to the configured remote branch automatically.
+   * Proactively detects and auto-fixes malformed remote URLs (e.g. unencoded spaces).
    */
   async pushRepo(
     folderPath: string,
     remoteName: string = 'origin',
     branchName?: string
-  ): Promise<ActionResult<{ output: string }>> {
+  ): Promise<ActionResult<PushRepoResult>> {
     logger.info('gitManager', `Executing push in ${folderPath} (remote: ${remoteName}, branch: ${branchName || 'auto'})`);
     try {
       let branch = branchName;
@@ -299,6 +313,22 @@ export class GitManager {
           branch = branchRes.stdout.trim();
         } else {
           branch = 'main';
+        }
+      }
+
+      // Proactive remote URL check: detect spaces or malformed URL before pushing
+      const remoteRes = await runProcess('git', ['remote', 'get-url', remoteName], { cwd: folderPath });
+      let currentRemoteUrl = remoteRes.code === 0 ? remoteRes.stdout.trim() : '';
+      let autoFixed = false;
+      let fixedUrl = '';
+
+      if (currentRemoteUrl && (currentRemoteUrl.includes(' ') || currentRemoteUrl.includes('%20'))) {
+        fixedUrl = sanitizeRemoteUrl(currentRemoteUrl);
+        logger.warn('gitManager', `Detected malformed remote URL with spaces ("${currentRemoteUrl}"). Auto-fixing to "${fixedUrl}"`);
+        const fixRes = await runProcess('git', ['remote', 'set-url', remoteName, fixedUrl], { cwd: folderPath });
+        if (fixRes.code === 0) {
+          currentRemoteUrl = fixedUrl;
+          autoFixed = true;
         }
       }
 
@@ -316,39 +346,65 @@ export class GitManager {
         : ['push', remoteName, branch];
 
       logger.info('gitManager', `Running git ${args.join(' ')}`);
-      const pushRes = await runProcess('git', args, { cwd: folderPath });
+      let pushRes = await runProcess('git', args, { cwd: folderPath });
+      let combined = `${pushRes.stdout}\n${pushRes.stderr}`.trim();
 
-      const combined = `${pushRes.stdout}\n${pushRes.stderr}`.trim();
+      // If push failed due to malformed URL (e.g. libcurl rejected spaces) and we haven't tried fixing yet
+      if (
+        pushRes.code !== 0 &&
+        (combined.includes('Malformed input to a URL function') || combined.includes('URL rejected')) &&
+        !autoFixed
+      ) {
+        const sanitized = sanitizeRemoteUrl(currentRemoteUrl);
+        if (sanitized !== currentRemoteUrl) {
+          logger.info('gitManager', `Push rejected with malformed URL. Attempting auto-fix to "${sanitized}" and retrying push...`);
+          await runProcess('git', ['remote', 'set-url', remoteName, sanitized], { cwd: folderPath });
+          pushRes = await runProcess('git', args, { cwd: folderPath });
+          combined = `${pushRes.stdout}\n${pushRes.stderr}`.trim();
+          if (pushRes.code === 0) {
+            autoFixed = true;
+            fixedUrl = sanitized;
+          }
+        }
+      }
 
       if (pushRes.code !== 0) {
         logger.error('gitManager', `git push failed with code ${pushRes.code}: ${combined}`);
+        const diagnosis = diagnoseGitError(combined, currentRemoteUrl);
         return {
           success: false,
           error: {
             code: 'GIT_PUSH_FAILED',
-            message: 'Git push operation failed.',
-            why: combined || `Process exited with code ${pushRes.code}.`,
-            modified: false,
-            nextStep: 'Ensure your remote repository exists and you have write permissions.',
+            message: diagnosis.title,
+            why: diagnosis.whatIsError,
+            modified: autoFixed,
+            nextStep: diagnosis.suggestion,
+            diagnosis,
           },
         };
       }
 
-      logger.info('gitManager', `git push succeeded: ${combined}`);
+      logger.info('gitManager', `git push succeeded: ${combined} (autoFixed: ${autoFixed})`);
       return {
         success: true,
-        data: { output: combined },
+        data: {
+          output: combined,
+          autoFixed,
+          fixedUrl: autoFixed ? fixedUrl : undefined,
+        },
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('gitManager', 'Push exception', err);
+      const diagnosis = diagnoseGitError(msg);
       return {
         success: false,
         error: {
           code: 'GIT_PUSH_ERROR',
-          message: 'Error executing git push.',
-          why: msg,
+          message: diagnosis.title,
+          why: diagnosis.whatIsError,
           modified: false,
+          diagnosis,
         },
       };
     }

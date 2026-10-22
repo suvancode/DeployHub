@@ -48,8 +48,10 @@ export const Step4GitHubRepo: React.FC<Step4Props> = ({
   loading,
   configuredRepoUrl,
 }) => {
+  const formatRepoName = (name: string) => name.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '');
+
   const [mode, setMode] = useState<'create' | 'connect'>('create');
-  const [repoName, setRepoName] = useState(defaultRepoName || inspection.folderName);
+  const [repoName, setRepoName] = useState(formatRepoName(defaultRepoName || inspection.folderName));
   const [isPrivate, setIsPrivate] = useState(true);
   const [description, setDescription] = useState('');
   const [remoteName] = useState('origin');
@@ -87,10 +89,11 @@ export const Step4GitHubRepo: React.FC<Step4Props> = ({
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    if (!repoName.trim()) return;
+    const safeRepoName = formatRepoName(repoName);
+    if (!safeRepoName) return;
 
     const res = await onCreateRepo({
-      name: repoName.trim(),
+      name: safeRepoName,
       description: description.trim(),
       isPrivate,
       remoteName,
@@ -234,10 +237,15 @@ export const Step4GitHubRepo: React.FC<Step4Props> = ({
                 <input
                   type="text"
                   value={repoName}
-                  onChange={(e) => setRepoName(e.target.value)}
+                  onChange={(e) => setRepoName(e.target.value.replace(/\s+/g, '-'))}
+                  onBlur={() => setRepoName(formatRepoName(repoName))}
                   required
+                  placeholder="e.g. my-cool-project"
                   className="w-full h-7 bg-devtoys-sidebar border border-devtoys-border rounded-md px-2.5 text-xs font-mono text-devtoys-primary focus:outline-none focus:border-devtoys-accent"
                 />
+                <p className="text-[10px] text-devtoys-muted mt-1">
+                  Spaces are automatically converted to hyphens (e.g. <span className="font-mono text-devtoys-accent">{formatRepoName(repoName) || 'my-project'}</span>)
+                </p>
               </div>
 
               <div>

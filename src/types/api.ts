@@ -177,6 +177,23 @@ export interface AppSettings {
   autoDetectVercel: boolean;
 }
 
+export interface GitErrorDiagnosis {
+  title: string;
+  whatIsError: string;
+  suggestion: string;
+  rawError: string;
+  canAutoFix: boolean;
+  autoFixLabel?: string;
+  autoFixType?: 'FIX_MALFORMED_URL' | 'SWITCH_SSH' | 'RECREATE_REMOTE';
+  suggestedUrl?: string;
+}
+
+export interface PushRepoResult {
+  output: string;
+  autoFixed?: boolean;
+  fixedUrl?: string;
+}
+
 export interface ActionResult<T = unknown> {
   success: boolean;
   data?: T;
@@ -187,6 +204,7 @@ export interface ActionResult<T = unknown> {
     modified: boolean;
     nextStep?: string;
     completedSteps?: string[];
+    diagnosis?: GitErrorDiagnosis;
   };
 }
 
@@ -232,7 +250,9 @@ export interface DeployHubAPI {
   applyGitignore: (folderPath: string, content: string) => Promise<ActionResult<void>>;
   createInitialCommit: (folderPath: string, message: string) => Promise<ActionResult<{ commitHash: string }>>;
   getManualPushCommand: (folderPath: string, remoteName: string, branchName: string) => Promise<ActionResult<ManualPushInfo>>;
-  pushRepo: (folderPath: string, remoteName?: string, branchName?: string) => Promise<ActionResult<{ output: string }>>;
+  pushRepo: (folderPath: string, remoteName?: string, branchName?: string) => Promise<ActionResult<PushRepoResult>>;
+  fixGitRemote: (folderPath: string, remoteName: string, fixedUrl: string) => Promise<ActionResult<void>>;
+  diagnoseGitError: (rawError: string, currentRemoteUrl?: string) => Promise<GitErrorDiagnosis>;
   
   // GitHub CLI Actions
   checkGitHubStatus: () => Promise<GitHubAccountStatus>;

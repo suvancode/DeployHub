@@ -134,12 +134,15 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       if (res.success) {
         setPushStatus({
           success: true,
-          message: `Code pushed successfully to ${project.remoteName || 'origin'}/${project.branchName || 'main'}!`,
+          message: res.data?.autoFixed && res.data.fixedUrl
+            ? `Remote URL auto-corrected to "${res.data.fixedUrl}" and code pushed successfully!`
+            : `Code pushed successfully to ${project.remoteName || 'origin'}/${project.branchName || 'main'}!`,
         });
       } else {
+        const diag = res.error?.diagnosis;
         setPushStatus({
           success: false,
-          message: res.error?.why || res.error?.message || 'Git push rejected by remote.',
+          message: diag ? `${diag.title}: ${diag.whatIsError} ${diag.suggestion}` : res.error?.why || res.error?.message || 'Git push rejected by remote.',
         });
       }
     } catch (e: unknown) {

@@ -19,6 +19,10 @@ const api: DeployHubAPI = {
     ipcRenderer.invoke('get-manual-push-command', folderPath, remoteName, branchName),
   pushRepo: (folderPath: string, remoteName?: string, branchName?: string) =>
     ipcRenderer.invoke('push-repo', folderPath, remoteName, branchName),
+  fixGitRemote: (folderPath: string, remoteName: string, fixedUrl: string) =>
+    ipcRenderer.invoke('fix-git-remote', folderPath, remoteName, fixedUrl),
+  diagnoseGitError: (rawError: string, currentRemoteUrl?: string) =>
+    ipcRenderer.invoke('diagnose-git-error', rawError, currentRemoteUrl),
 
   checkGitHubStatus: () => ipcRenderer.invoke('check-github-status'),
   switchGitHubAccount: (username: string) => ipcRenderer.invoke('switch-github-account', username),

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ShieldAlert,
   Terminal,
   Copy,
   Check,
@@ -8,9 +7,12 @@ import {
   ArrowLeft,
   UploadCloud,
   ArrowUpCircle,
-  CheckCircle2,
+  Wrench,
+  AlertTriangle,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
-import { ManualPushInfo } from '../../types/api';
+import { ManualPushInfo, GitErrorDiagnosis } from '../../types/api';
 import { Button } from '../common/Button';
 import { Alert } from '../common/Alert';
 
@@ -32,9 +34,19 @@ export const Step5ManualPush: React.FC<Step5Props> = ({
   const [copied, setCopied] = useState(false);
   const [userConfirmedPushed, setUserConfirmedPushed] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
   const [pushOutput, setPushOutput] = useState<string | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
+  const [diagnosis, setDiagnosis] = useState<GitErrorDiagnosis | null>(null);
   const [pushSuccess, setPushSuccess] = useState(false);
+  const [currentRepoUrl, setCurrentRepoUrl] = useState(pushInfo.repoUrl);
+  const [autoFixedMessage, setAutoFixedMessage] = useState<string | null>(null);
+
+  // Check if URL has malformed spaces
+  const hasSpacesInRemote = Boolean(
+    currentRepoUrl && (currentRepoUrl.includes(' ') || currentRepoUrl.includes('%20'))
+  );
+  const sanitizedProposedUrl = currentRepoUrl ? currentRepoUrl.replace(/\s+/g, '-').replace(/%20/g, '-') : '';
 
   const handleCopy = async () => {
     try {
@@ -50,20 +62,69 @@ export const Step5ManualPush: React.FC<Step5Props> = ({
     setIsPushing(true);
     setPushError(null);
     setPushOutput(null);
+    setDiagnosis(null);
+    setAutoFixedMessage(null);
+
     try {
       const res = await window.deployHubAPI.pushRepo(projectPath, pushInfo.remoteName, pushInfo.branch);
       if (res.success && res.data) {
         setPushSuccess(true);
         setPushOutput(res.data.output);
         setUserConfirmedPushed(true);
+        if (res.data.autoFixed && res.data.fixedUrl) {
+          setCurrentRepoUrl(res.data.fixedUrl);
+          setAutoFixedMessage(`DeployHub automatically corrected the malformed remote URL to "${res.data.fixedUrl}"!`);
+        }
       } else {
-        setPushError(res.error?.why || res.error?.message || 'Git push failed.');
+        const rawErr = res.error?.why || res.error?.message || 'Git push failed.';
+        setPushError(rawErr);
+        if (res.error?.diagnosis) {
+          setDiagnosis(res.error.diagnosis);
+        } else {
+          const diag = await window.deployHubAPI.diagnoseGitError(rawErr, currentRepoUrl);
+          setDiagnosis(diag);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setPushError(`Push error: ${msg}`);
+      const diag = await window.deployHubAPI.diagnoseGitError(msg, currentRepoUrl);
+      setDiagnosis(diag);
     } finally {
       setIsPushing(false);
+    }
+  };
+
+  const handleAutoFixRemote = async (fixedUrl: string) => {
+    setIsFixing(true);
+    setPushError(null);
+    setDiagnosis(null);
+    try {
+      const fixRes = await window.deployHubAPI.fixGitRemote(projectPath, pushInfo.remoteName, fixedUrl);
+      if (fixRes.success) {
+        setCurrentRepoUrl(fixedUrl);
+        setAutoFixedMessage(`Remote URL successfully updated to "${fixedUrl}". Pushing commits now...`);
+        // Immediately trigger push after fixing
+        const pushRes = await window.deployHubAPI.pushRepo(projectPath, pushInfo.remoteName, pushInfo.branch);
+        if (pushRes.success && pushRes.data) {
+          setPushSuccess(true);
+          setPushOutput(pushRes.data.output);
+          setUserConfirmedPushed(true);
+          setAutoFixedMessage(`Fixed remote URL to "${fixedUrl}" and pushed code successfully!`);
+        } else {
+          const raw = pushRes.error?.why || pushRes.error?.message || 'Push failed after remote fix.';
+          setPushError(raw);
+          const diag = await window.deployHubAPI.diagnoseGitError(raw, fixedUrl);
+          setDiagnosis(diag);
+        }
+      } else {
+        setPushError(fixRes.error?.why || fixRes.error?.message || 'Failed to update remote URL.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPushError(`Auto-fix error: ${msg}`);
+    } finally {
+      setIsFixing(false);
     }
   };
 
@@ -79,10 +140,35 @@ export const Step5ManualPush: React.FC<Step5Props> = ({
       {/* Target Remote Info */}
       <div className="p-2.5 rounded-md border border-devtoys-border bg-devtoys-sidebar flex items-center justify-between text-[11px]">
         <span className="text-devtoys-muted">Target Remote ({pushInfo.remoteName}/{pushInfo.branch}):</span>
-        <span className="text-devtoys-accent font-mono truncate max-w-[320px]" title={pushInfo.repoUrl}>
-          {pushInfo.repoUrl || 'origin'}
+        <span className="text-devtoys-accent font-mono truncate max-w-[320px]" title={currentRepoUrl}>
+          {currentRepoUrl || 'origin'}
         </span>
       </div>
+
+      {/* Proactive Malformed Space Warning if detected on load */}
+      {hasSpacesInRemote && !pushSuccess && (
+        <div className="p-3 rounded-md border border-devtoys-warning/40 bg-devtoys-warning/10 space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-devtoys-warning shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-devtoys-primary">Spaces Detected in Remote URL</div>
+              <p className="text-[11px] text-devtoys-muted mt-0.5">
+                The remote URL contains spaces (<code className="text-devtoys-warning font-mono">{currentRepoUrl}</code>).
+                Git will reject this with a malformed URL error. GitHub repository names use hyphens instead.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={() => handleAutoFixRemote(sanitizedProposedUrl)}
+              loading={isFixing}
+              icon={<Wrench className="w-3 h-3" />}
+            >
+              Auto-Fix to Hyphenated URL
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Auto-Push Action Box */}
       <div className="p-3.5 rounded-md border border-devtoys-accent/40 bg-devtoys-accent/10 space-y-2.5">
@@ -110,16 +196,84 @@ export const Step5ManualPush: React.FC<Step5Props> = ({
           </Button>
         </div>
 
-        {pushSuccess && (
-          <Alert variant="success" title="Push Completed Successfully">
-            Your code has been uploaded to <span className="font-mono font-bold">{pushInfo.repoUrl}</span>! You can now proceed to Vercel deployment.
+        {autoFixedMessage && (
+          <Alert variant="info" title="Automatic Fix Applied">
+            <div className="flex items-center gap-1.5 text-devtoys-primary">
+              <Sparkles className="w-3.5 h-3.5 text-devtoys-accent shrink-0" />
+              <span>{autoFixedMessage}</span>
+            </div>
           </Alert>
         )}
 
-        {pushError && (
-          <Alert variant="error" title="Push Failed" onClose={() => setPushError(null)}>
-            <div className="font-mono text-[11px] whitespace-pre-wrap">{pushError}</div>
+        {pushSuccess && (
+          <Alert variant="success" title="Push Completed Successfully">
+            Your code has been uploaded to <span className="font-mono font-bold">{currentRepoUrl}</span>! You can now proceed to Vercel deployment.
           </Alert>
+        )}
+
+        {/* Intelligent Error & Auto-Fix Card */}
+        {pushError && (
+          <div className="p-3.5 rounded-md border border-devtoys-error/40 bg-devtoys-error/10 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-devtoys-error shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-devtoys-primary">
+                    {diagnosis?.title || 'Push Failed'}
+                  </div>
+                  <div className="text-[11px] text-devtoys-primary/90 mt-1 leading-relaxed">
+                    <strong className="text-devtoys-error">What is the error: </strong>
+                    {diagnosis?.whatIsError || pushError}
+                  </div>
+                  {diagnosis?.suggestion && (
+                    <div className="text-[11px] text-devtoys-muted mt-1 leading-relaxed">
+                      <strong>How to fix: </strong>
+                      {diagnosis.suggestion}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setPushError(null);
+                  setDiagnosis(null);
+                }}
+              >
+                ✕
+              </Button>
+            </div>
+
+            {/* Auto-Fix Action Button */}
+            {diagnosis?.canAutoFix && diagnosis.suggestedUrl && (
+              <div className="pt-1 flex items-center justify-between border-t border-devtoys-error/20">
+                <span className="text-[11px] text-devtoys-muted">
+                  Suggested target: <code className="font-mono text-devtoys-accent">{diagnosis.suggestedUrl}</code>
+                </span>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleAutoFixRemote(diagnosis.suggestedUrl!)}
+                  loading={isFixing}
+                  icon={<Wrench className="w-3.5 h-3.5" />}
+                >
+                  {diagnosis.autoFixLabel || 'Fix Remote & Retry'}
+                </Button>
+              </div>
+            )}
+
+            {/* Collapsible raw technical error */}
+            <details className="text-[10px] text-devtoys-muted font-mono pt-1">
+              <summary className="cursor-pointer hover:text-devtoys-primary select-none">
+                Show Raw Terminal Output
+              </summary>
+              <pre className="mt-1 p-2 rounded bg-devtoys-sidebar border border-devtoys-border whitespace-pre-wrap overflow-x-auto text-[10px]">
+                {pushError}
+              </pre>
+            </details>
+          </div>
         )}
       </div>
 
