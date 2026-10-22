@@ -51,6 +51,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [loading, setLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   // Wizard state
   const [inspection, setInspection] = useState<ProjectInspection | null>(null);
@@ -77,13 +78,15 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   // Step 1: Folder Selection & Inspection
   const handleSelectFolder = async () => {
     setLoading(true);
+    setScanError(null);
     try {
       const folder = await window.deployHubAPI.selectFolder();
       if (folder) {
         await runInspection(folder);
       }
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setScanError(`Folder selection failed: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -91,27 +94,38 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
   const handleManualPath = async (path: string) => {
     setLoading(true);
+    setScanError(null);
     try {
       await runInspection(path);
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setScanError(`Folder inspection failed: ${msg}`);
     } finally {
       setLoading(false);
     }
   };
 
   const runInspection = async (folderPath: string) => {
-    const res = await window.deployHubAPI.inspectProject(folderPath);
-    if (res.success && res.data) {
-      setInspection(res.data);
-      setProjectName(res.data.folderName);
-      if (res.data.currentBranch) {
-        setConfiguredBranch(res.data.currentBranch);
+    try {
+      const res = await window.deployHubAPI.inspectProject(folderPath);
+      if (res.success && res.data) {
+        setInspection(res.data);
+        setProjectName(res.data.folderName);
+        setScanError(null);
+        if (res.data.currentBranch) {
+          setConfiguredBranch(res.data.currentBranch);
+        }
+        if (res.data.remotes.length > 0) {
+          setConfiguredRepoUrl(res.data.remotes[0].fetchUrl);
+          setConfiguredRemote(res.data.remotes[0].name);
+        }
+      } else {
+        const errorMsg = res.error?.why || res.error?.message || 'Unable to inspect the selected folder.';
+        setScanError(errorMsg);
       }
-      if (res.data.remotes.length > 0) {
-        setConfiguredRepoUrl(res.data.remotes[0].fetchUrl);
-        setConfiguredRemote(res.data.remotes[0].name);
-      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setScanError(`Inspection failed: ${msg}`);
     }
   };
 
@@ -335,6 +349,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         {currentStep === 1 && (
           <Step1FolderSelect
             inspection={inspection}
+            scanError={scanError}
             onSelectFolder={handleSelectFolder}
             onManualPathSubmit={handleManualPath}
             onRefreshInspection={() => inspection && runInspection(inspection.folderPath)}

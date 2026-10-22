@@ -19,18 +19,33 @@ export function setupIpcHandlers() {
   logger.info('ipc', 'Registering IPC handlers');
 
   // Folder selection
-  ipcMain.handle('select-folder', async () => {
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    const result = await dialog.showOpenDialog(focusedWindow || undefined as unknown as BrowserWindow, {
-      title: 'Select Project Folder',
-      properties: ['openDirectory', 'createDirectory'],
-    });
+  ipcMain.handle('select-folder', async (event) => {
+    logger.info('ipc', 'select-folder IPC invoked');
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+      const options: Electron.OpenDialogOptions = {
+        title: 'Select Project Folder',
+        properties: ['openDirectory'],
+      };
 
-    if (result.canceled || result.filePaths.length === 0) {
+      const result = win
+        ? await dialog.showOpenDialog(win, options)
+        : await dialog.showOpenDialog(options);
+
+      logger.info('ipc', `dialog result: canceled=${result.canceled}, filePaths=${JSON.stringify(result.filePaths)}`);
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return null;
+      }
+
+      const selectedPath = path.resolve(result.filePaths[0]);
+      logger.info('ipc', `Resolved project folder: ${selectedPath}`);
+      return selectedPath;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error('ipc', 'Error opening folder dialog', msg);
       return null;
     }
-
-    return path.resolve(result.filePaths[0]);
   });
 
   // Project Inspection

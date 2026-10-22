@@ -13,9 +13,11 @@ import {
 import { ProjectInspection } from '../../types/api';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
+import { Alert } from '../common/Alert';
 
 interface Step1Props {
   inspection: ProjectInspection | null;
+  scanError?: string | null;
   onSelectFolder: () => void;
   onManualPathSubmit: (path: string) => void;
   onRefreshInspection: () => void;
@@ -25,6 +27,7 @@ interface Step1Props {
 
 export const Step1FolderSelect: React.FC<Step1Props> = ({
   inspection,
+  scanError,
   onSelectFolder,
   onManualPathSubmit,
   onRefreshInspection,
@@ -77,6 +80,13 @@ export const Step1FolderSelect: React.FC<Step1Props> = ({
           </Button>
         </form>
       </div>
+
+      {/* Error Message */}
+      {scanError && (
+        <Alert variant="error" title="Folder Inspection Failed">
+          {scanError}
+        </Alert>
+      )}
 
       {/* Inspection Report */}
       {inspection && (
