@@ -1,0 +1,50 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import {
+  DeployHubAPI,
+  CreateRepoOptions,
+  ConnectRepoOptions,
+  VercelProjectConfig,
+  ProjectRecord,
+  AppSettings,
+} from '../../src/types/api';
+
+const api: DeployHubAPI = {
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
+  inspectProject: (folderPath: string) => ipcRenderer.invoke('inspect-project', folderPath),
+
+  initGitRepo: (folderPath: string, branch: string) => ipcRenderer.invoke('init-git-repo', folderPath, branch),
+  applyGitignore: (folderPath: string, content: string) => ipcRenderer.invoke('apply-gitignore', folderPath, content),
+  createInitialCommit: (folderPath: string, message: string) => ipcRenderer.invoke('create-initial-commit', folderPath, message),
+  getManualPushCommand: (folderPath: string, remoteName: string, branchName: string) =>
+    ipcRenderer.invoke('get-manual-push-command', folderPath, remoteName, branchName),
+
+  checkGitHubStatus: () => ipcRenderer.invoke('check-github-status'),
+  listGitHubRepos: () => ipcRenderer.invoke('list-github-repos'),
+  createGitHubRepo: (folderPath: string, options: CreateRepoOptions) =>
+    ipcRenderer.invoke('create-github-repo', folderPath, options),
+  connectGitHubRepo: (folderPath: string, options: ConnectRepoOptions) =>
+    ipcRenderer.invoke('connect-github-repo', folderPath, options),
+
+  checkVercelStatus: () => ipcRenderer.invoke('check-vercel-status'),
+  linkVercelProject: (folderPath: string, config: VercelProjectConfig) =>
+    ipcRenderer.invoke('link-vercel-project', folderPath, config),
+  deployInitialVercel: (folderPath: string, isProduction: boolean) =>
+    ipcRenderer.invoke('deploy-initial-vercel', folderPath, isProduction),
+
+  getProjects: () => ipcRenderer.invoke('get-projects'),
+  getProject: (id: string) => ipcRenderer.invoke('get-project', id),
+  saveProject: (project: ProjectRecord) => ipcRenderer.invoke('save-project', project),
+  deleteProject: (id: string) => ipcRenderer.invoke('delete-project', id),
+  exportRegistry: () => ipcRenderer.invoke('export-registry'),
+  importRegistry: (jsonString: string) => ipcRenderer.invoke('import-registry', jsonString),
+
+  openInExplorer: (path: string) => ipcRenderer.invoke('open-in-explorer', path),
+  openInTerminal: (path: string) => ipcRenderer.invoke('open-in-terminal', path),
+  openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
+  getLogs: () => ipcRenderer.invoke('get-logs'),
+  clearLogs: () => ipcRenderer.invoke('clear-logs'),
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  saveSettings: (settings: Partial<AppSettings>) => ipcRenderer.invoke('save-settings', settings),
+};
+
+contextBridge.exposeInMainWorld('deployHubAPI', api);
