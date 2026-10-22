@@ -56,11 +56,11 @@ export const Step5ManualPush: React.FC<Step5Props> = ({
       </div>
 
       {/* Command Block */}
-      <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2">
+      <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2.5">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="font-semibold text-devtoys-primary">Push Command</span>
-          <span className="text-devtoys-muted font-mono">
-            {pushInfo.remoteName}/{pushInfo.branch}
+          <span className="text-devtoys-muted">Target Remote ({pushInfo.remoteName}/{pushInfo.branch}):</span>
+          <span className="text-devtoys-accent font-mono truncate max-w-[280px]" title={pushInfo.repoUrl}>
+            {pushInfo.repoUrl || 'origin'}
           </span>
         </div>
 

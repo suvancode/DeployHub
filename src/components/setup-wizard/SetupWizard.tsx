@@ -173,33 +173,49 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   };
 
   // Step 4: GitHub Repo Creation / Connection
-  const handleCreateRepo = async (options: CreateRepoOptions): Promise<string | null> => {
-    if (!inspection) return null;
+  const handleCreateRepo = async (
+    options: CreateRepoOptions
+  ): Promise<{ success: boolean; url?: string; error?: string }> => {
+    if (!inspection) return { success: false, error: 'No project inspected.' };
     setLoading(true);
     try {
       const res = await window.deployHubAPI.createGitHubRepo(inspection.folderPath, options);
       if (res.success && res.data) {
         setConfiguredRepoUrl(res.data.repoUrl);
         setConfiguredRemote(res.data.remoteName);
-        return res.data.repoUrl;
+        return { success: true, url: res.data.repoUrl };
       }
-      return null;
+      return {
+        success: false,
+        error: res.error?.why || res.error?.message || 'Failed to create GitHub repository.',
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConnectRepo = async (options: ConnectRepoOptions): Promise<string | null> => {
-    if (!inspection) return null;
+  const handleConnectRepo = async (
+    options: ConnectRepoOptions
+  ): Promise<{ success: boolean; url?: string; error?: string }> => {
+    if (!inspection) return { success: false, error: 'No project inspected.' };
     setLoading(true);
     try {
       const res = await window.deployHubAPI.connectGitHubRepo(inspection.folderPath, options);
       if (res.success && res.data) {
         setConfiguredRepoUrl(res.data.repoUrl);
         setConfiguredRemote(res.data.remoteName);
-        return res.data.repoUrl;
+        return { success: true, url: res.data.repoUrl };
       }
-      return null;
+      return {
+        success: false,
+        error: res.error?.why || res.error?.message || 'Failed to connect GitHub repository.',
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
     } finally {
       setLoading(false);
     }
@@ -384,8 +400,10 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           <Step4GitHubRepo
             inspection={inspection}
             defaultRepoName={projectName}
+            githubUsername={githubStatus?.username}
             onCreateRepo={handleCreateRepo}
             onConnectRepo={handleConnectRepo}
+            onClearConfiguredRepo={() => setConfiguredRepoUrl(null)}
             onListRepos={handleListRepos}
             onNext={prepareStep5}
             onBack={() => setCurrentStep(3)}

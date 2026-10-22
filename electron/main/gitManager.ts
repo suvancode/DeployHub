@@ -142,8 +142,8 @@ export class GitManager {
   /**
    * Sets or adds a remote. NEVER silently replaces an existing different remote.
    */
-  async setRemote(folderPath: string, remoteName: string, remoteUrl: string): Promise<ActionResult<void>> {
-    logger.info('gitManager', `Configuring remote "${remoteName}" -> "${remoteUrl}" in ${folderPath}`);
+  async setRemote(folderPath: string, remoteName: string, remoteUrl: string, allowUpdate = false): Promise<ActionResult<void>> {
+    logger.info('gitManager', `Configuring remote "${remoteName}" -> "${remoteUrl}" in ${folderPath} (allowUpdate: ${allowUpdate})`);
     try {
       const remotesRes = await runProcess('git', ['remote', '-v'], { cwd: folderPath });
       const lines = remotesRes.stdout.split('\n').filter(Boolean);
@@ -160,6 +160,14 @@ export class GitManager {
       if (existingUrl) {
         if (existingUrl === remoteUrl) {
           // Already matches, all good
+          return { success: true };
+        }
+        if (allowUpdate) {
+          logger.info('gitManager', `Updating existing remote "${remoteName}" to "${remoteUrl}"`);
+          const updateRes = await runProcess('git', ['remote', 'set-url', remoteName, remoteUrl], { cwd: folderPath });
+          if (updateRes.code !== 0) {
+            throw new Error(`Failed to update remote: ${updateRes.stderr || updateRes.stdout}`);
+          }
           return { success: true };
         }
         // Remote exists but points to different URL

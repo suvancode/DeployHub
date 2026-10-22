@@ -254,8 +254,8 @@ export class GitHubManager {
         }
       }
 
-      // 4. Configure local Git remote safely
-      const remoteResult = await gitManager.setRemote(folderPath, remoteName, repoUrl);
+      // 4. Configure local Git remote safely (allow update if user explicitly created repo)
+      const remoteResult = await gitManager.setRemote(folderPath, remoteName, repoUrl, true);
       if (!remoteResult.success) {
         return {
           success: false,
@@ -320,8 +320,8 @@ export class GitHubManager {
         };
       }
 
-      // 2. Configure local Git remote safely
-      const remoteResult = await gitManager.setRemote(folderPath, remoteName, repoUrl);
+      // 2. Configure local Git remote safely (allow update if user explicitly connected repo)
+      const remoteResult = await gitManager.setRemote(folderPath, remoteName, repoUrl, true);
       if (!remoteResult.success) {
         return {
           success: false,
