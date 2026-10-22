@@ -28,11 +28,17 @@ async function createWindow() {
   const appPath = app.getAppPath();
   logger.info('main', `App path resolved: ${appPath}`);
 
-  // Resolve preload path reliably
-  let preloadPath = path.join(appPath, 'dist-electron/preload/index.js');
-  if (!fs.existsSync(preloadPath)) {
-    preloadPath = path.join(__dirname, '../preload/index.js');
-  }
+  // Resolve preload path reliably (.cjs preferred for CommonJS execution under "type": "module")
+  const candidatePreloadPaths = [
+    path.join(appPath, 'dist-electron/preload/index.cjs'),
+    path.join(appPath, 'dist-electron/preload/index.js'),
+    path.join(__dirname, '../preload/index.cjs'),
+    path.join(__dirname, '../preload/index.js'),
+    path.join(__dirname, '../../preload/index.cjs'),
+    path.join(__dirname, '../../preload/index.js'),
+  ];
+
+  const preloadPath = candidatePreloadPaths.find((p) => fs.existsSync(p)) || candidatePreloadPaths[0];
   logger.info('main', `Preload path resolved: ${preloadPath} (exists: ${fs.existsSync(preloadPath)})`);
 
   mainWindow = new BrowserWindow({
