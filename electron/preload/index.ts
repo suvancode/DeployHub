@@ -17,6 +17,8 @@ const api: DeployHubAPI = {
   createInitialCommit: (folderPath: string, message: string) => ipcRenderer.invoke('create-initial-commit', folderPath, message),
   getManualPushCommand: (folderPath: string, remoteName: string, branchName: string) =>
     ipcRenderer.invoke('get-manual-push-command', folderPath, remoteName, branchName),
+  pushRepo: (folderPath: string, remoteName?: string, branchName?: string) =>
+    ipcRenderer.invoke('push-repo', folderPath, remoteName, branchName),
 
   checkGitHubStatus: () => ipcRenderer.invoke('check-github-status'),
   switchGitHubAccount: (username: string) => ipcRenderer.invoke('switch-github-account', username),

@@ -281,6 +281,78 @@ export class GitManager {
       };
     }
   }
+
+  /**
+   * Pushes the repository commits to the configured remote branch automatically.
+   */
+  async pushRepo(
+    folderPath: string,
+    remoteName: string = 'origin',
+    branchName?: string
+  ): Promise<ActionResult<{ output: string }>> {
+    logger.info('gitManager', `Executing push in ${folderPath} (remote: ${remoteName}, branch: ${branchName || 'auto'})`);
+    try {
+      let branch = branchName;
+      if (!branch) {
+        const branchRes = await runProcess('git', ['branch', '--show-current'], { cwd: folderPath });
+        if (branchRes.code === 0 && branchRes.stdout) {
+          branch = branchRes.stdout.trim();
+        } else {
+          branch = 'main';
+        }
+      }
+
+      // Check if upstream is configured
+      const upstreamRes = await runProcess(
+        'git',
+        ['rev-parse', '--abbrev-ref', `${branch}@{upstream}`],
+        { cwd: folderPath }
+      );
+      const isUpstreamSet = upstreamRes.code === 0;
+
+      // When pushing initially or if upstream is not set, use -u remoteName branch
+      const args = !isUpstreamSet
+        ? ['push', '-u', remoteName, branch]
+        : ['push', remoteName, branch];
+
+      logger.info('gitManager', `Running git ${args.join(' ')}`);
+      const pushRes = await runProcess('git', args, { cwd: folderPath });
+
+      const combined = `${pushRes.stdout}\n${pushRes.stderr}`.trim();
+
+      if (pushRes.code !== 0) {
+        logger.error('gitManager', `git push failed with code ${pushRes.code}: ${combined}`);
+        return {
+          success: false,
+          error: {
+            code: 'GIT_PUSH_FAILED',
+            message: 'Git push operation failed.',
+            why: combined || `Process exited with code ${pushRes.code}.`,
+            modified: false,
+            nextStep: 'Ensure your remote repository exists and you have write permissions.',
+          },
+        };
+      }
+
+      logger.info('gitManager', `git push succeeded: ${combined}`);
+      return {
+        success: true,
+        data: { output: combined },
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error('gitManager', 'Push exception', err);
+      return {
+        success: false,
+        error: {
+          code: 'GIT_PUSH_ERROR',
+          message: 'Error executing git push.',
+          why: msg,
+          modified: false,
+        },
+      };
+    }
+  }
 }
 
 export const gitManager = new GitManager();

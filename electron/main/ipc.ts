@@ -97,6 +97,10 @@ export function setupIpcHandlers() {
     return gitManager.getManualPushCommand(folderPath, remoteName, branchName);
   });
 
+  ipcMain.handle('push-repo', async (_, folderPath: string, remoteName?: string, branchName?: string) => {
+    return gitManager.pushRepo(folderPath, remoteName, branchName);
+  });
+
   // GitHub Setup
   ipcMain.handle('check-github-status', async () => {
     return githubManager.checkStatus();

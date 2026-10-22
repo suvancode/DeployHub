@@ -7,9 +7,11 @@ import {
   ShieldAlert,
   Info,
   FolderGit2,
+  UploadCloud,
 } from 'lucide-react';
 import { ProjectRecord } from '../../types/api';
 import { Button } from '../common/Button';
+import { Alert } from '../common/Alert';
 
 interface ManualPushPageProps {
   projects: ProjectRecord[];
@@ -27,6 +29,8 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
   );
   const [copiedInitial, setCopiedInitial] = useState(false);
   const [copiedSubsequent, setCopiedSubsequent] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushStatus, setPushStatus] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (selectedProject) {
@@ -43,6 +47,37 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
     : 'git push -u origin main';
 
   const subsequentPushCmd = 'git push';
+
+  const handleAutoPush = async () => {
+    if (!activeProject) return;
+    setIsPushing(true);
+    setPushStatus(null);
+    try {
+      const res = await window.deployHubAPI.pushRepo(
+        activeProject.path,
+        activeProject.remoteName || 'origin',
+        activeProject.branchName || 'main'
+      );
+      if (res.success) {
+        setPushStatus({
+          success: true,
+          message: `Code pushed successfully to ${activeProject.remoteName || 'origin'}/${activeProject.branchName || 'main'}!`,
+        });
+      } else {
+        setPushStatus({
+          success: false,
+          message: res.error?.why || res.error?.message || 'Git push failed.',
+        });
+      }
+    } catch (err: unknown) {
+      setPushStatus({
+        success: false,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsPushing(false);
+    }
+  };
 
   const copyCommand = async (cmd: string, isInitial: boolean) => {
     try {
@@ -122,6 +157,40 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
                     {activeProject.repoUrl ? activeProject.repoUrl.replace('https://github.com/', '') : 'Unlinked'}
                   </span>
                 </div>
+              </div>
+
+              {/* Direct Automatic Push Action */}
+              <div className="p-3.5 rounded-md border border-devtoys-accent/40 bg-devtoys-accent/10 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <UploadCloud className="w-4 h-4 text-devtoys-accent shrink-0" />
+                    <div>
+                      <div className="font-semibold text-devtoys-primary">Push Code to GitHub Automatically</div>
+                      <div className="text-[11px] text-devtoys-muted">
+                        Pushes local commits to <span className="font-mono text-devtoys-accent">{activeProject.remoteName || 'origin'}/{activeProject.branchName || 'main'}</span> directly.
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleAutoPush}
+                    loading={isPushing}
+                    icon={<UploadCloud className="w-3.5 h-3.5" />}
+                  >
+                    {isPushing ? 'Pushing...' : 'Push to GitHub Now'}
+                  </Button>
+                </div>
+
+                {pushStatus && (
+                  <Alert
+                    variant={pushStatus.success ? 'success' : 'error'}
+                    title={pushStatus.success ? 'Push Successful' : 'Push Failed'}
+                    onClose={() => setPushStatus(null)}
+                  >
+                    {pushStatus.message}
+                  </Alert>
+                )}
               </div>
 
               {/* Command 1: Initial Push */}

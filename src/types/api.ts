@@ -178,6 +178,7 @@ export interface DeployHubAPI {
   applyGitignore: (folderPath: string, content: string) => Promise<ActionResult<void>>;
   createInitialCommit: (folderPath: string, message: string) => Promise<ActionResult<{ commitHash: string }>>;
   getManualPushCommand: (folderPath: string, remoteName: string, branchName: string) => Promise<ActionResult<ManualPushInfo>>;
+  pushRepo: (folderPath: string, remoteName?: string, branchName?: string) => Promise<ActionResult<{ output: string }>>;
   
   // GitHub CLI Actions
   checkGitHubStatus: () => Promise<GitHubAccountStatus>;

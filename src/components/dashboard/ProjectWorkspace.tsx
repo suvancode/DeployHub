@@ -13,6 +13,7 @@ import {
   RotateCw,
   FolderGit2,
   AlertTriangle,
+  UploadCloud,
 } from 'lucide-react';
 import { ProjectRecord } from '../../types/api';
 import { Button } from '../common/Button';
@@ -37,10 +38,39 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'git' | 'github' | 'vercel'>('overview');
   const [copied, setCopied] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushStatus, setPushStatus] = useState<{ success: boolean; message: string } | null>(null);
 
   const pushCommand = project.branchName
     ? `git push -u ${project.remoteName || 'origin'} ${project.branchName}`
     : 'git push';
+
+  const handlePush = async () => {
+    setIsPushing(true);
+    setPushStatus(null);
+    try {
+      const res = await window.deployHubAPI.pushRepo(
+        project.path,
+        project.remoteName || 'origin',
+        project.branchName || 'main'
+      );
+      if (res.success) {
+        setPushStatus({
+          success: true,
+          message: `Code pushed successfully to ${project.remoteName || 'origin'}/${project.branchName || 'main'}!`,
+        });
+      } else {
+        setPushStatus({
+          success: false,
+          message: res.error?.why || res.error?.message || 'Git push failed.',
+        });
+      }
+    } catch (e: unknown) {
+      setPushStatus({ success: false, message: String(e) });
+    } finally {
+      setIsPushing(false);
+    }
+  };
 
   const handleCopyPush = async () => {
     try {
@@ -156,13 +186,13 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       {/* Tab 1: Overview */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
-          {/* Quick Manual Push Command Banner */}
-          <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2">
+          {/* Push Command / Auto Push Box */}
+          <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-devtoys-primary flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-devtoys-accent" /> Manual Push Command
+                <UploadCloud className="w-3.5 h-3.5 text-devtoys-accent" /> Publish Code to GitHub
               </span>
-              <span className="text-[11px] text-devtoys-muted">Run this command to publish your commits</span>
+              <span className="text-[11px] text-devtoys-muted">Push your committed changes to remote repository</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -173,15 +203,41 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               <Button
                 variant="primary"
                 size="sm"
+                onClick={handlePush}
+                loading={isPushing}
+                icon={<UploadCloud className="w-3.5 h-3.5" />}
+              >
+                Push Now
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleCopyPush}
                 icon={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               >
                 {copied ? 'Copied' : 'Copy'}
               </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenTerminal(project.path)}
+                icon={<Terminal className="w-3.5 h-3.5" />}
+              >
+                Terminal
+              </Button>
             </div>
-            <p className="text-[11px] text-devtoys-muted">
-              DeployHub will never automatically push code. Run this command manually in your terminal when you are ready to publish.
-            </p>
+
+            {pushStatus && (
+              <div
+                className={`p-2 rounded text-[11px] border ${
+                  pushStatus.success
+                    ? 'border-devtoys-success/30 bg-devtoys-success/10 text-devtoys-success'
+                    : 'border-devtoys-error/30 bg-devtoys-error/10 text-devtoys-error'
+                }`}
+              >
+                {pushStatus.message}
+              </div>
+            )}
           </div>
 
           {/* Properties Grid */}
