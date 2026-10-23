@@ -215,7 +215,11 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
         setSingleDeployStatus({
           platform: 'GitHub Pages',
           success: true,
-          message: `GitHub Pages enabled: ${res.data.url}`,
+          message:
+            res.data.message ||
+            (res.data.isLive
+              ? `GitHub Pages is live: ${res.data.url}`
+              : `GitHub Pages enabled: ${res.data.url} (Building ~1-2 min)`),
           url: res.data.url,
         });
       } else {
@@ -494,6 +498,11 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
                           >
                             {pipelineStatus.results.githubPages.url}
                           </a>
+                          {pipelineStatus.results.githubPages.isLive === false && (
+                            <span className="text-[10px] text-amber-400 block pt-0.5 font-sans">
+                              (Building on GitHub ~1-2 min)
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>

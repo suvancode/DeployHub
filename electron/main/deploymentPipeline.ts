@@ -111,6 +111,9 @@ export async function pushAndDeployPipeline(
         platform: 'github-pages',
         success: true,
         url: ghRes.data.url,
+        isLive: ghRes.data.isLive,
+        status: ghRes.data.status,
+        message: ghRes.data.message,
       };
     } else {
       results.githubPages = {

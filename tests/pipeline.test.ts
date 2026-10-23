@@ -125,4 +125,35 @@ describe('pushAndDeployPipeline', () => {
     expect(vercelManager.deployInitial).not.toHaveBeenCalled();
     expect(netlifyManager.deploy).not.toHaveBeenCalled();
   });
+
+  it('should deploy to github pages and return live status', async () => {
+    vi.mocked(gitManager.pushRepo).mockResolvedValueOnce({
+      success: true,
+      data: { output: 'Everything up-to-date' },
+    });
+
+    vi.mocked(ghPagesManager.deploy).mockResolvedValueOnce({
+      success: true,
+      data: {
+        url: 'https://suvancode.github.io/my-app/',
+        isLive: true,
+        status: 'built',
+        message: 'GitHub Pages is live at https://suvancode.github.io/my-app/',
+      },
+    });
+
+    const result = await pushAndDeployPipeline(
+      'C:\\fake\\path',
+      'origin',
+      'main',
+      true,
+      'my-app',
+      ['github-pages']
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.results?.githubPages?.url).toBe('https://suvancode.github.io/my-app/');
+    expect(result.data?.results?.githubPages?.isLive).toBe(true);
+    expect(result.data?.results?.githubPages?.status).toBe('built');
+  });
 });

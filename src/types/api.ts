@@ -133,7 +133,10 @@ export interface NetlifyStatus {
 export interface GitHubPagesStatus {
   enabled: boolean;
   url?: string;
-  status?: string;
+  status?: string; // 'built' | 'building' | 'queued' | 'errored'
+  isLive?: boolean;
+  httpStatus?: number;
+  buildError?: string;
   customDomain?: string;
   sourceBranch?: string;
   sourcePath?: string;
@@ -214,6 +217,9 @@ export interface DeployResultItem {
   url?: string; // shortest canonical domain (e.g. https://slug.vercel.app)
   inspectUrl?: string;
   error?: string;
+  isLive?: boolean;
+  status?: string;
+  message?: string;
 }
 
 export interface PipelineResult {
@@ -295,7 +301,10 @@ export interface DeployHubAPI {
 
   // GitHub Pages Actions
   checkGhPagesStatus: (folderPath: string) => Promise<GitHubPagesStatus>;
-  deployGhPages: (folderPath: string, branchName?: string) => Promise<ActionResult<{ url: string }>>;
+  deployGhPages: (
+    folderPath: string,
+    branchName?: string
+  ) => Promise<ActionResult<{ url: string; isLive?: boolean; status?: string; message?: string }>>;
 
   // Automated Multi-Target Pipeline
   pushAndDeploy: (

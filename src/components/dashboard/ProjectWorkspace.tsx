@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Folder,
@@ -15,10 +15,15 @@ import {
   UploadCloud,
   Rocket,
   CheckCircle2,
+  CheckCircle,
+  AlertCircle,
   Cloud,
   FileCode,
   Sparkles,
   Layers,
+  RefreshCw,
+  Info,
+  Loader2,
 } from 'lucide-react';
 import {
   ProjectRecord,
@@ -26,6 +31,7 @@ import {
   VercelStatus,
   NetlifyStatus,
   PipelineResult,
+  GitHubPagesStatus,
 } from '../../types/api';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -88,6 +94,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [isDeployingVercel, setIsDeployingVercel] = useState(false);
   const [isDeployingNetlify, setIsDeployingNetlify] = useState(false);
   const [isDeployingGhPages, setIsDeployingGhPages] = useState(false);
+  const [isCheckingGhPages, setIsCheckingGhPages] = useState(false);
+  const [ghPagesStatus, setGhPagesStatus] = useState<GitHubPagesStatus | null>(null);
   const [isPipelineRunning, setIsPipelineRunning] = useState(false);
   const [isProduction, setIsProduction] = useState(true);
 
@@ -119,6 +127,48 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   const togglePlatform = (p: 'vercel' | 'netlify' | 'githubPages') => {
     setSelectedPlatforms((prev) => ({ ...prev, [p]: !prev[p] }));
+  };
+
+  // Fetch GitHub Pages status on mount or project change
+  useEffect(() => {
+    let isMounted = true;
+    window.deployHubAPI
+      .checkGhPagesStatus(project.path)
+      .then((status) => {
+        if (isMounted) setGhPagesStatus(status);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [project.path]);
+
+  // Background polling for GitHub Pages when building/propagating
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (ghPagesStatus?.enabled && !ghPagesStatus?.isLive) {
+      timer = setTimeout(async () => {
+        try {
+          const updated = await window.deployHubAPI.checkGhPagesStatus(project.path);
+          setGhPagesStatus(updated);
+        } catch {
+          // ignore
+        }
+      }, 6000);
+    }
+    return () => clearTimeout(timer);
+  }, [ghPagesStatus, project.path]);
+
+  const handleRefreshGhPagesStatus = async () => {
+    setIsCheckingGhPages(true);
+    try {
+      const updated = await window.deployHubAPI.checkGhPagesStatus(project.path);
+      setGhPagesStatus(updated);
+    } catch {
+      // ignore
+    } finally {
+      setIsCheckingGhPages(false);
+    }
   };
 
   // 1. Push code to GitHub
@@ -252,10 +302,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
       const res = await window.deployHubAPI.deployGhPages(project.path, project.branchName || 'main');
       if (res.success && res.data) {
         const liveUrl = res.data.url;
+        const isLive = res.data.isLive;
         setDeployFeedback({
           platform: 'GitHub Pages',
           success: true,
-          message: `GitHub Pages enabled: ${liveUrl}`,
+          message: res.data.message || (isLive ? `GitHub Pages is live: ${liveUrl}` : `GitHub Pages enabled: ${liveUrl} (Building ~1-2 min)`),
           url: liveUrl,
         });
 
@@ -265,6 +316,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             githubPagesUrl: liveUrl,
             updatedAt: new Date().toISOString(),
           });
+        }
+
+        // Refresh live status
+        try {
+          const updated = await window.deployHubAPI.checkGhPagesStatus(project.path);
+          setGhPagesStatus(updated);
+        } catch {
+          // ignore
         }
       } else {
         setDeployFeedback({
@@ -823,27 +882,46 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                         <span className="font-semibold text-devtoys-primary flex items-center gap-1">
                           <FileCode className="w-3 h-3 text-devtoys-success" /> GitHub Pages
                         </span>
-                        <Badge variant={pipelineResult.results.githubPages.success ? 'success' : 'error'}>
-                          {pipelineResult.results.githubPages.success ? 'Live' : 'Failed'}
+                        <Badge
+                          variant={
+                            pipelineResult.results.githubPages.success
+                              ? pipelineResult.results.githubPages.isLive === false
+                                ? 'warning'
+                                : 'success'
+                              : 'error'
+                          }
+                        >
+                          {pipelineResult.results.githubPages.success
+                            ? pipelineResult.results.githubPages.isLive === false
+                              ? 'Building (~1-2m)'
+                              : 'Live'
+                            : 'Failed'}
                         </Badge>
                       </div>
                       {pipelineResult.results.githubPages.url ? (
-                        <div className="flex items-center justify-between gap-1 pt-1">
-                          <button
-                            onClick={() => onOpenUrl(pipelineResult.results!.githubPages!.url!)}
-                            className="text-devtoys-success hover:underline font-mono text-[11px] truncate text-left"
-                            title={pipelineResult.results.githubPages.url}
-                          >
-                            {pipelineResult.results.githubPages.url}
-                          </button>
-                          <button
-                            onClick={() => handleCopy(pipelineResult.results!.githubPages!.url!)}
-                            className="p-1 hover:text-devtoys-primary text-devtoys-muted"
-                            title="Copy URL"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </div>
+                        <>
+                          <div className="flex items-center justify-between gap-1 pt-1">
+                            <button
+                              onClick={() => onOpenUrl(pipelineResult.results!.githubPages!.url!)}
+                              className="text-devtoys-success hover:underline font-mono text-[11px] truncate text-left"
+                              title={pipelineResult.results.githubPages.url}
+                            >
+                              {pipelineResult.results.githubPages.url}
+                            </button>
+                            <button
+                              onClick={() => handleCopy(pipelineResult.results!.githubPages!.url!)}
+                              className="p-1 hover:text-devtoys-primary text-devtoys-muted"
+                              title="Copy URL"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                          {pipelineResult.results.githubPages.isLive === false && (
+                            <div className="text-[10px] text-amber-400 font-sans pt-0.5 leading-snug">
+                              Initial build in progress (~1-2m). Fastly CDN propagating.
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div className="text-[10px] text-devtoys-error truncate">
                           {pipelineResult.results.githubPages.error}
@@ -963,13 +1041,20 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             <div className="p-3 flex items-center justify-between">
               <span className="text-devtoys-muted">GitHub Pages URL</span>
               {project.githubPagesUrl ? (
-                <button
-                  onClick={() => onOpenUrl(project.githubPagesUrl!)}
-                  className="text-devtoys-success hover:underline flex items-center gap-1 font-mono font-medium"
-                >
-                  <span>{project.githubPagesUrl}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {ghPagesStatus?.enabled && (
+                    <Badge variant={ghPagesStatus.isLive ? 'success' : 'warning'}>
+                      {ghPagesStatus.isLive ? 'Live' : 'Building (~1-2m)'}
+                    </Badge>
+                  )}
+                  <button
+                    onClick={() => onOpenUrl(project.githubPagesUrl!)}
+                    className="text-devtoys-success hover:underline flex items-center gap-1 font-mono font-medium"
+                  >
+                    <span>{project.githubPagesUrl}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
               ) : (
                 <span className="text-devtoys-muted italic">Not deployed yet ({ghPagesShortUrl})</span>
               )}
@@ -1165,35 +1250,71 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
       {/* Tab 6: GitHub Pages */}
       {activeTab === 'gh-pages' && (
-        <div className="p-4 rounded-md border border-devtoys-border bg-devtoys-card space-y-3">
-          <div className="flex items-center gap-2 text-devtoys-primary font-semibold text-xs">
-            <FileCode className="w-4 h-4 text-devtoys-success" />
-            <span>GitHub Pages Integration</span>
+        <div className="p-4 rounded-md border border-devtoys-border bg-devtoys-card space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-devtoys-primary font-semibold text-xs">
+              <FileCode className="w-4 h-4 text-devtoys-success" />
+              <span>GitHub Pages Integration</span>
+            </div>
+            {ghPagesStatus?.enabled && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={handleRefreshGhPagesStatus}
+                loading={isCheckingGhPages}
+                icon={<RefreshCw className="w-3 h-3" />}
+              >
+                Verify Live Status
+              </Button>
+            )}
           </div>
 
-          <div className="space-y-2 text-devtoys-secondary">
+          <div className="space-y-2 text-devtoys-secondary text-xs">
             <div className="flex justify-between py-1 border-b border-devtoys-border/60">
               <span className="text-devtoys-muted">Repository:</span>
               <span className="font-mono text-devtoys-primary">{ownerName}/{repoName}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-devtoys-border/60">
-              <span className="text-devtoys-muted">Pages URL:</span>
-              <span className="font-mono text-devtoys-success">{ghPagesShortUrl}</span>
+              <span className="text-devtoys-muted">Pages Canonical URL:</span>
+              <span className="font-mono text-devtoys-success font-medium">{ghPagesShortUrl}</span>
             </div>
-            <div className="flex justify-between py-1">
-              <span className="text-devtoys-muted">Status:</span>
-              {project.githubPagesUrl ? (
-                <button
-                  onClick={() => onOpenUrl(project.githubPagesUrl!)}
-                  className="text-devtoys-success hover:underline flex items-center gap-1 font-mono"
-                >
-                  <span>{project.githubPagesUrl}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </button>
+            <div className="flex justify-between py-1 border-b border-devtoys-border/60">
+              <span className="text-devtoys-muted">Live CDN Status:</span>
+              {ghPagesStatus?.enabled ? (
+                ghPagesStatus.isLive ? (
+                  <span className="text-devtoys-success flex items-center gap-1.5 font-semibold">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Live (HTTP 200 OK)
+                  </span>
+                ) : (
+                  <span className="text-amber-400 flex items-center gap-1.5 font-semibold">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Building & Propagating (~1-2 min)
+                  </span>
+                )
               ) : (
                 <span className="text-devtoys-muted italic">Not enabled yet</span>
               )}
             </div>
+            {ghPagesStatus?.sourceBranch && (
+              <div className="flex justify-between py-1 border-b border-devtoys-border/60">
+                <span className="text-devtoys-muted">Source Branch / Path:</span>
+                <span className="font-mono text-devtoys-primary">
+                  {ghPagesStatus.sourceBranch}:{ghPagesStatus.sourcePath || '/'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Explanatory callout for 404 behavior */}
+          <div className="p-3 rounded-md bg-devtoys-sidebar/70 border border-devtoys-border/80 text-[11px] text-devtoys-secondary space-y-1">
+            <div className="font-semibold text-devtoys-primary flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-devtoys-accent" />
+              Why might GitHub Pages return 404 initially?
+            </div>
+            <p className="leading-relaxed text-devtoys-muted">
+              GitHub Pages deploys asynchronously. When first enabled or after new code is pushed, GitHub takes 1 to 2 minutes to compile the site and distribute it to its global Fastly edge CDN. During this initial setup window, visiting the URL will display GitHub's 404 page until the background build completes.
+            </p>
           </div>
 
           <div className="pt-2 flex items-center gap-2">
@@ -1204,8 +1325,18 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               loading={isDeployingGhPages}
               icon={<FileCode className="w-3.5 h-3.5" />}
             >
-              Enable / Deploy GitHub Pages
+              {ghPagesStatus?.enabled ? 'Re-Deploy / Update GitHub Pages' : 'Enable / Deploy GitHub Pages'}
             </Button>
+            {project.githubPagesUrl && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenUrl(project.githubPagesUrl!)}
+                icon={<ExternalLink className="w-3.5 h-3.5" />}
+              >
+                Open Site
+              </Button>
+            )}
           </div>
         </div>
       )}
