@@ -203,8 +203,29 @@ export class VercelManager {
   }
 
   /**
+   * Pings URL via HTTP GET with timeout to determine if site is live (200 OK) or login/404 blocked.
+   */
+  async checkHttpLive(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'User-Agent': 'DeployHub-StatusCheck/1.1' },
+        signal: AbortSignal.timeout(3500),
+        redirect: 'manual',
+      });
+      const loc = response.headers.get('location') || '';
+      if (loc.includes('sso-api') || loc.includes('login')) {
+        return false;
+      }
+      return response.status >= 200 && response.status < 400;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Performs automated deployment using Vercel CLI.
-   * Guarantees non-interactive automated deployment and extracts the shortest canonical URL.
+   * Guarantees non-interactive automated deployment, disables SSO protection, and extracts verified live URL.
    */
   async deployInitial(
     folderPath: string,
@@ -227,6 +248,16 @@ export class VercelManager {
     }
 
     try {
+      // Ensure team SSO protection is disabled so deployment is publicly accessible without login walls
+      try {
+        await this.runVercel(['api', `/v9/projects/${safeName}`, '--method', 'PATCH', '--input', '-'], {
+          cwd: folderPath,
+          input: JSON.stringify({ ssoProtection: null }),
+        });
+      } catch (ssoErr) {
+        logger.debug('vercelManager', 'Could not patch ssoProtection (personal/hobby scope or already disabled)', ssoErr);
+      }
+
       const args = ['deploy', '--yes'];
       if (isProduction) {
         args.push('--prod');
@@ -252,36 +283,52 @@ export class VercelManager {
         };
       }
 
-      // Parse URLs from stdout & stderr
-      // 1. Look for canonical shortest URL from "▲ Aliased https://<short-domain>.vercel.app"
-      // or "Production URL: https://<short-domain>.vercel.app"
-      let shortestUrl = '';
-      let inspectUrl: string | undefined;
-
-      const aliasedMatch = combinedOutput.match(/(?:▲\s*Aliased|Production URL:)\s*(https:\/\/[a-zA-Z0-9_\-\.]+vercel\.app)/i);
-      if (aliasedMatch) {
-        shortestUrl = aliasedMatch[1];
+      // Re-verify SSO protection is disabled post-deployment
+      try {
+        await this.runVercel(['api', `/v9/projects/${safeName}`, '--method', 'PATCH', '--input', '-'], {
+          cwd: folderPath,
+          input: JSON.stringify({ ssoProtection: null }),
+        });
+      } catch {
+        // ignore
       }
 
+      let inspectUrl: string | undefined;
       const inspectMatch = combinedOutput.match(/(https:\/\/vercel\.com\/[^\s\n]+)/i);
       if (inspectMatch) {
         inspectUrl = inspectMatch[1];
       }
 
-      // If no aliased match, find any production/preview URL
-      if (!shortestUrl) {
-        const urlMatches = [...combinedOutput.matchAll(/(https:\/\/[a-zA-Z0-9_\-\.]+\.vercel\.app)/gi)];
-        if (urlMatches.length > 0) {
-          // Find shortest URL string among all vercel.app URLs!
-          const allUrls = urlMatches.map((m) => m[1]);
-          allUrls.sort((a, b) => a.length - b.length);
-          shortestUrl = allUrls[0];
+      // Collect all candidate URLs from deployment output
+      const candidates: string[] = [];
+      const aliasedMatch = combinedOutput.match(/(?:▲\s*Aliased|Production URL:)\s*(https:\/\/[a-zA-Z0-9_\-\.]+vercel\.app)/i);
+      if (aliasedMatch && !candidates.includes(aliasedMatch[1])) {
+        candidates.push(aliasedMatch[1]);
+      }
+
+      const allMatches = [...combinedOutput.matchAll(/(https:\/\/[a-zA-Z0-9_\-\.]+\.vercel\.app)/gi)];
+      for (const m of allMatches) {
+        if (!candidates.includes(m[1])) {
+          candidates.push(m[1]);
         }
       }
 
-      // Fallback: the canonical project domain on Vercel is https://<safeName>.vercel.app
+      // Sort candidate URLs by length (prefer shortest)
+      candidates.sort((a, b) => a.length - b.length);
+
+      // Verify candidates to ensure we don't return a 404 domain (e.g. if the shortest slug was taken)
+      let shortestUrl = '';
+      for (const cand of candidates) {
+        const isLive = await this.checkHttpLive(cand);
+        if (isLive) {
+          shortestUrl = cand;
+          break;
+        }
+      }
+
+      // If no candidate returned HTTP 200 immediately, fall back to shortest found
       if (!shortestUrl) {
-        shortestUrl = `https://${safeName}.vercel.app`;
+        shortestUrl = candidates[0] || `https://${safeName}.vercel.app`;
       }
 
       logger.info('vercelManager', `Deployment successful. Shortest canonical URL: ${shortestUrl}`);

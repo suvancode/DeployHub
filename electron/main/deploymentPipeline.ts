@@ -1,15 +1,19 @@
+import fs from 'fs';
+import path from 'path';
 import { gitManager } from './gitManager';
 import { vercelManager } from './vercelManager';
 import { netlifyManager } from './netlifyManager';
 import { ghPagesManager } from './ghPagesManager';
+import { runProcess } from './processRunner';
 import { logger } from './logger';
 import { ActionResult, PipelineResult, DeployResultItem } from '../../src/types/api';
 
 /**
  * Executes a full automation pipeline:
- * 1. Pushes local commits to remote GitHub repository
- * 2. Deploys to selected platforms: Vercel, Netlify, and/or GitHub Pages
- * 3. Extracts and returns the shortest canonical URLs for each platform
+ * 1. Ensures static projects have an index.html entry point
+ * 2. Pushes local commits to remote GitHub repository
+ * 3. Deploys to selected platforms: Vercel, Netlify, and/or GitHub Pages
+ * 4. Extracts and returns the shortest canonical URLs for each platform
  */
 export async function pushAndDeployPipeline(
   folderPath: string,
@@ -23,6 +27,28 @@ export async function pushAndDeployPipeline(
     'pipeline',
     `Starting Automation Pipeline for ${folderPath} (targets: ${targets.join(', ')}, slug: ${customSlug})`
   );
+
+  // Pre-flight check: ensure static HTML projects have an index.html entrypoint so root deployment doesn't 404
+  try {
+    const hasRootIndex = fs.existsSync(path.join(folderPath, 'index.html'));
+    const hasDistIndex = ['dist', 'build', 'out', 'public'].some((d) =>
+      fs.existsSync(path.join(folderPath, d, 'index.html'))
+    );
+    if (!hasRootIndex && !hasDistIndex && !fs.existsSync(path.join(folderPath, 'package.json'))) {
+      const files = fs.readdirSync(folderPath);
+      const htmlFiles = files.filter((f) => f.endsWith('.html') && !f.startsWith('.'));
+      if (htmlFiles.length > 0) {
+        htmlFiles.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+        const chosen = htmlFiles[0];
+        fs.copyFileSync(path.join(folderPath, chosen), path.join(folderPath, 'index.html'));
+        logger.info('pipeline', `Auto-created index.html from ${chosen} to prevent root 404.`);
+        await runProcess('git', ['add', 'index.html'], { cwd: folderPath });
+        await runProcess('git', ['commit', '-m', `feat: add index.html from ${chosen}`], { cwd: folderPath });
+      }
+    }
+  } catch (indexErr) {
+    logger.warn('pipeline', 'Could not run index.html pre-flight check', indexErr);
+  }
 
   // Step 1: Push code to GitHub
   logger.info('pipeline', 'Step 1: Pushing code to GitHub');
