@@ -79,6 +79,16 @@ const api: DeployHubAPI = {
   clearLogs: () => ipcRenderer.invoke('clear-logs'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings: Partial<AppSettings>) => ipcRenderer.invoke('save-settings', settings),
+
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadAndInstallUpdate: (downloadUrl: string) => ipcRenderer.invoke('download-and-install-update', downloadUrl),
+  onUpdateProgress: (callback: (progress: any) => void) => {
+    const listener = (_: any, progress: any) => callback(progress);
+    ipcRenderer.on('update-progress', listener);
+    return () => {
+      ipcRenderer.removeListener('update-progress', listener);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('deployHubAPI', api);

@@ -195,6 +195,15 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   // 3. Deploy to Netlify (standalone)
   const handleDeployNetlify = async () => {
+    if (!netlifyStatus?.authenticated) {
+      setDeployFeedback({
+        platform: 'Netlify',
+        success: false,
+        message: 'You are not logged in to Netlify. Please click "Netlify: Login" in the top header or settings to authenticate with your account before deploying.',
+      });
+      return;
+    }
+
     setIsDeployingNetlify(true);
     setDeployFeedback(null);
     try {
@@ -284,6 +293,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
     if (targets.length === 0) {
       setPipelineError('Please select at least one deployment platform (Vercel, Netlify, or GitHub Pages).');
+      return;
+    }
+
+    if (targets.includes('netlify') && !netlifyStatus?.authenticated) {
+      setPipelineError('Netlify is selected for deployment, but you are not logged in. Please click "Netlify: Login" in the header to authenticate with your account, or uncheck Netlify.');
       return;
     }
 
@@ -557,21 +571,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-devtoys-border/60 text-[11px]">
                 <div className="p-2 rounded bg-devtoys-card border border-devtoys-border flex items-center justify-between">
                   <span className="text-devtoys-muted flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-devtoys-accent" /> Vercel:
+                    <Globe className="w-3 h-3 text-devtoys-accent" /> Vercel Preview:
                   </span>
                   <span className="font-mono text-devtoys-accent truncate font-medium">{vercelShortUrl}</span>
                 </div>
 
                 <div className="p-2 rounded bg-devtoys-card border border-devtoys-border flex items-center justify-between">
                   <span className="text-devtoys-muted flex items-center gap-1">
-                    <Cloud className="w-3 h-3 text-teal-400" /> Netlify:
+                    <Cloud className="w-3 h-3 text-teal-400" /> Netlify Preview:
                   </span>
                   <span className="font-mono text-teal-400 truncate font-medium">{netlifyShortUrl}</span>
                 </div>
 
                 <div className="p-2 rounded bg-devtoys-card border border-devtoys-border flex items-center justify-between">
                   <span className="text-devtoys-muted flex items-center gap-1">
-                    <FileCode className="w-3 h-3 text-devtoys-success" /> GH Pages:
+                    <FileCode className="w-3 h-3 text-devtoys-success" /> GH Pages Preview:
                   </span>
                   <span className="font-mono text-devtoys-success truncate font-medium">{ghPagesShortUrl}</span>
                 </div>
@@ -603,6 +617,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   />
                   <Cloud className="w-3.5 h-3.5 text-teal-400" />
                   <span>Netlify</span>
+                  {!netlifyStatus?.authenticated && (
+                    <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1 rounded ml-0.5">
+                      (Login required)
+                    </span>
+                  )}
                 </label>
 
                 <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary select-none">

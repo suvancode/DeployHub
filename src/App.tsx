@@ -19,6 +19,7 @@ import { VercelProjectsPage } from './components/tools/VercelProjectsPage';
 import { RecentProjectsPage } from './components/tools/RecentProjectsPage';
 import { LogViewer } from './components/logs/LogViewer';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { UpdateModal } from './components/common/UpdateModal';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavItemId>('all-projects');
@@ -28,6 +29,7 @@ export const App: React.FC = () => {
   const [vercelStatus, setVercelStatus] = useState<VercelStatus | null>(null);
   const [netlifyStatus, setNetlifyStatus] = useState<NetlifyStatus | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({
     theme: 'dark',
     preferredTerminal: 'wt',
@@ -300,6 +302,7 @@ export const App: React.FC = () => {
             onLoginGitHub={handleLoginGitHub}
             onLoginVercel={handleLoginVercel}
             onLoginNetlify={handleLoginNetlify}
+            onOpenUpdates={() => setIsUpdateModalOpen(true)}
           />
 
           <main className="flex-1 overflow-y-auto">
@@ -424,6 +427,7 @@ export const App: React.FC = () => {
                 onLoginGitHub={handleLoginGitHub}
                 onLoginVercel={handleLoginVercel}
                 onLoginNetlify={handleLoginNetlify}
+                onOpenUpdates={() => setIsUpdateModalOpen(true)}
               />
             )}
           </main>
@@ -435,6 +439,13 @@ export const App: React.FC = () => {
         selectedProjectName={selectedProject?.name || null}
         githubStatus={githubStatus}
         vercelStatus={vercelStatus}
+      />
+
+      {/* In-App Auto-Update Modal */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        onOpenExternalUrl={handleOpenUrl}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import {
   LogIn,
   RotateCw,
   Cloud,
+  DownloadCloud,
 } from 'lucide-react';
 import { GitHubAccountStatus, VercelStatus, NetlifyStatus } from '../../types/api';
 
@@ -23,6 +24,7 @@ interface HeaderProps {
   onLoginGitHub?: () => Promise<void>;
   onLoginVercel?: () => Promise<void>;
   onLoginNetlify?: () => Promise<void>;
+  onOpenUpdates?: () => void;
   actions?: React.ReactNode;
 }
 
@@ -37,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLoginGitHub,
   onLoginVercel,
   onLoginNetlify,
+  onOpenUpdates,
   actions,
 }) => {
   const [switchingGh, setSwitchingGh] = useState(false);
@@ -188,6 +191,18 @@ export const Header: React.FC<HeaderProps> = ({
             <Cloud className="w-3 h-3 text-teal-400" />
             <span>Netlify: Login</span>
             <LogIn className="w-2.5 h-2.5" />
+          </button>
+        )}
+
+        {/* In-App Updates Button */}
+        {onOpenUpdates && (
+          <button
+            onClick={onOpenUpdates}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-devtoys-border bg-devtoys-card text-[11px] font-medium text-devtoys-muted hover:text-devtoys-accent hover:border-devtoys-accent/50 transition-colors"
+            title="Check for application updates"
+          >
+            <DownloadCloud className="w-3 h-3 text-devtoys-accent" />
+            <span className="hidden sm:inline">Updates</span>
           </button>
         )}
 

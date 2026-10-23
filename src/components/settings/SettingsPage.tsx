@@ -15,6 +15,7 @@ import {
   UserPlus,
   LogIn,
   RotateCw,
+  DownloadCloud,
 } from 'lucide-react';
 import { AppSettings, GitHubAccountStatus, VercelStatus, NetlifyStatus } from '../../types/api';
 import { Button } from '../common/Button';
@@ -32,6 +33,7 @@ interface SettingsPageProps {
   onLoginGitHub?: () => Promise<void>;
   onLoginVercel?: () => Promise<void>;
   onLoginNetlify?: () => Promise<void>;
+  onOpenUpdates?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -47,6 +49,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onLoginGitHub,
   onLoginVercel,
   onLoginNetlify,
+  onOpenUpdates,
 }) => {
   const [preferredTerminal, setPreferredTerminal] = useState(settings.preferredTerminal);
   const [defaultBranch, setDefaultBranch] = useState(settings.defaultBranch);
@@ -369,7 +372,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* Section 4: Local Storage & Backup */}
+      {/* Section 4: Application Updates */}
+      <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-devtoys-primary flex items-center gap-2">
+            <DownloadCloud className="w-4 h-4 text-devtoys-accent" />
+            Application Updates
+          </span>
+          <span className="text-[11px] text-devtoys-muted font-mono">
+            Current: v1.1.0
+          </span>
+        </div>
+        <p className="text-[11px] text-devtoys-muted leading-relaxed">
+          DeployHub checks GitHub Releases and updates directly inside the application. No need to manually visit your browser or re-download setup files.
+        </p>
+
+        {onOpenUpdates && (
+          <div className="pt-1">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onOpenUpdates}
+              icon={<DownloadCloud className="w-3.5 h-3.5" />}
+            >
+              Check for Updates & Auto-Install
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Section 5: Local Storage & Backup */}
       <div className="p-3.5 rounded-md border border-devtoys-border bg-devtoys-card space-y-3">
         <span className="font-semibold text-devtoys-primary block">Local Storage & Registry Backup</span>
         <p className="text-[11px] text-devtoys-muted leading-relaxed">

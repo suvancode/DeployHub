@@ -134,6 +134,22 @@ export class NetlifyManager {
 
     logger.info('netlifyManager', `Deploying to Netlify (dir: ${publishDir}, slug: ${siteSlug})`);
 
+    // Strict authentication check: user must be logged into Netlify
+    const status = await this.checkStatus();
+    if (!status.authenticated) {
+      logger.warn('netlifyManager', 'Cannot deploy to Netlify: User is not authenticated');
+      return {
+        success: false,
+        error: {
+          code: 'NETLIFY_NOT_AUTHENTICATED',
+          message: 'You are not logged in to Netlify.',
+          why: 'Netlify deployment requires an active account. Deploying anonymously can lead to subdomain collisions with existing websites.',
+          modified: false,
+          nextStep: 'Click "Netlify: Login" in the header to authenticate with your Netlify account first.',
+        },
+      };
+    }
+
     const args = ['deploy', '--dir', publishDir];
     if (isProduction) {
       args.push('--prod');
@@ -141,7 +157,6 @@ export class NetlifyManager {
     if (siteSlug) {
       args.push('--site-name', siteSlug);
     }
-    args.push('--allow-anonymous');
 
     try {
       const res = await this.runNetlify(args, {
@@ -150,6 +165,21 @@ export class NetlifyManager {
       });
 
       const combined = `${res.stdout}\n${res.stderr}`;
+
+      // Check if site name already belongs to someone else
+      if (combined.includes('already exists') || combined.includes('Site name already exists') || combined.includes('is already registered')) {
+        return {
+          success: false,
+          error: {
+            code: 'NETLIFY_SITE_TAKEN',
+            message: `The Netlify subdomain "${siteSlug}.netlify.app" is already registered by another user.`,
+            why: 'Netlify subdomain names are globally unique. Another user on Netlify already owns this name.',
+            modified: false,
+            nextStep: 'Change the custom slug in the input box to a unique name and deploy again.',
+          },
+        };
+      }
+
       if (res.code !== 0 && !combined.includes('Website URL') && !combined.includes('Live Draft URL') && !combined.includes('.netlify.app')) {
         return {
           success: false,
@@ -187,8 +217,17 @@ export class NetlifyManager {
         siteUrl = allUrls[0];
       }
 
-      if (!siteUrl && siteSlug) {
-        siteUrl = `https://${siteSlug}.netlify.app`;
+      if (!siteUrl) {
+        return {
+          success: false,
+          error: {
+            code: 'NETLIFY_DEPLOY_FAILED',
+            message: 'Netlify deployment did not return a valid website URL.',
+            why: combined || 'No live deployment URL found in Netlify CLI output.',
+            modified: false,
+            nextStep: 'Ensure you are logged into Netlify and have permissions to deploy.',
+          },
+        };
       }
 
       return {

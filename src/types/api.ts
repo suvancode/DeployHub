@@ -230,6 +230,24 @@ export interface PipelineResult {
   };
 }
 
+export interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseName: string;
+  releaseNotes: string;
+  publishedAt: string;
+  downloadUrl?: string;
+  assetName?: string;
+  assetSize?: number;
+}
+
+export interface DownloadProgress {
+  percent: number;
+  transferredBytes: number;
+  totalBytes: number;
+}
+
 export interface MultiDeployPipelineOptions {
   folderPath: string;
   remoteName?: string;
@@ -305,6 +323,11 @@ export interface DeployHubAPI {
   clearLogs: () => Promise<void>;
   getSettings: () => Promise<AppSettings>;
   saveSettings: (settings: AppSettings) => Promise<ActionResult<void>>;
+
+  // In-App Auto-Updates
+  checkForUpdates: () => Promise<ActionResult<UpdateInfo>>;
+  downloadAndInstallUpdate: (downloadUrl: string) => Promise<ActionResult<void>>;
+  onUpdateProgress: (callback: (progress: DownloadProgress) => void) => () => void;
 }
 
 declare global {

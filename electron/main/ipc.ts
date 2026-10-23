@@ -11,6 +11,7 @@ import { configManager } from './configManager';
 import { openInTerminal } from './terminalHelper';
 import { logger } from './logger';
 import { diagnoseGitError } from './errorDiagnostics';
+import { updateManager } from './updateManager';
 import {
   ProjectRecord,
   CreateRepoOptions,
@@ -310,5 +311,14 @@ export function setupIpcHandlers() {
         error: { code: 'SETTINGS_FAILED', message: msg, modified: false },
       };
     }
+  });
+
+  // In-App Auto-Updates
+  ipcMain.handle('check-for-updates', async () => {
+    return updateManager.checkForUpdates();
+  });
+
+  ipcMain.handle('download-and-install-update', async (_, downloadUrl: string) => {
+    return updateManager.downloadAndInstallUpdate(downloadUrl);
   });
 }
