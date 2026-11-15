@@ -418,6 +418,52 @@ export class GitManager {
       };
     }
   }
+
+  /**
+   * Clones a remote repository to the target destination folder.
+   */
+  async cloneRepo(repoUrl: string, targetPath: string): Promise<ActionResult<{ path: string }>> {
+    logger.info('gitManager', `Cloning ${repoUrl} into ${targetPath}`);
+    try {
+      if (fs.existsSync(targetPath)) {
+        const gitDir = path.join(targetPath, '.git');
+        if (fs.existsSync(gitDir)) {
+          logger.info('gitManager', `Target folder is already a cloned git repository: ${targetPath}`);
+          return { success: true, data: { path: targetPath } };
+        }
+      }
+
+      // Ensure parent directory exists
+      const parentDir = path.dirname(targetPath);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+
+      const cloneRes = await runProcess('git', ['clone', repoUrl, targetPath], {
+        timeoutMs: 180000,
+      });
+
+      if (cloneRes.code !== 0) {
+        throw new Error(cloneRes.stderr || cloneRes.stdout || 'Git clone failed');
+      }
+
+      logger.info('gitManager', `Successfully cloned ${repoUrl} to ${targetPath}`);
+      return { success: true, data: { path: targetPath } };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error('gitManager', 'Failed to clone repository', err);
+      return {
+        success: false,
+        error: {
+          code: 'GIT_CLONE_FAILED',
+          message: 'Failed to clone repository.',
+          why: msg,
+          modified: false,
+          nextStep: 'Ensure you have valid Git credentials and network access.',
+        },
+      };
+    }
+  }
 }
 
 export const gitManager = new GitManager();

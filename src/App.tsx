@@ -14,6 +14,7 @@ import { DashboardView } from './components/dashboard/DashboardView';
 import { ProjectWorkspace } from './components/dashboard/ProjectWorkspace';
 import { SetupWizard } from './components/setup-wizard/SetupWizard';
 import { ManualPushPage } from './components/tools/ManualPushPage';
+import { DeployGitHubRepoPage } from './components/tools/DeployGitHubRepoPage';
 import { BranchesRemotesPage } from './components/tools/BranchesRemotesPage';
 import { VercelProjectsPage } from './components/tools/VercelProjectsPage';
 import { RecentProjectsPage } from './components/tools/RecentProjectsPage';
@@ -241,6 +242,8 @@ export const App: React.FC = () => {
         return 'Branches & Remotes';
       case 'manual-push':
         return 'Manual Push Commands';
+      case 'deploy-repo':
+        return 'Deploy GitHub Repo Everywhere';
       case 'vercel-projects':
       case 'deployment-status':
         return 'Vercel Deployment';
@@ -265,6 +268,7 @@ export const App: React.FC = () => {
       case 'branches-remotes':
       case 'manual-push':
         return 'Git Tools';
+      case 'deploy-repo':
       case 'vercel-projects':
       case 'deployment-status':
         return 'Deployment';
@@ -332,6 +336,7 @@ export const App: React.FC = () => {
                     setSelectedProject(null);
                     setCurrentTab('repo-setup');
                   }}
+                  onDeployGitHubRepo={() => setCurrentTab('deploy-repo')}
                   onSelectProject={handleSelectProject}
                   onOpenFolder={handleOpenFolder}
                   onOpenTerminal={handleOpenTerminal}
@@ -386,6 +391,22 @@ export const App: React.FC = () => {
                 projects={projects}
                 selectedProject={selectedProject}
                 onOpenTerminal={handleOpenTerminal}
+              />
+            )}
+
+            {/* View: Deploy GitHub Repo to All 3 Platforms */}
+            {currentTab === 'deploy-repo' && (
+              <DeployGitHubRepoPage
+                projects={projects}
+                githubStatus={githubStatus}
+                vercelStatus={vercelStatus}
+                netlifyStatus={netlifyStatus}
+                onRefreshProjects={refreshProjects}
+                onSelectProject={(p) => {
+                  setSelectedProject(p);
+                  setCurrentTab('all-projects');
+                }}
+                onOpenUrl={handleOpenUrl}
               />
             )}
 

@@ -86,7 +86,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   }>({
     vercel: true,
     netlify: true,
-    githubPages: false,
+    githubPages: true,
   });
 
   // Automation states
@@ -127,6 +127,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   const togglePlatform = (p: 'vercel' | 'netlify' | 'githubPages') => {
     setSelectedPlatforms((prev) => ({ ...prev, [p]: !prev[p] }));
+  };
+
+  const selectAllPlatforms = () => {
+    setSelectedPlatforms({
+      vercel: true,
+      netlify: true,
+      githubPages: true,
+    });
   };
 
   // Fetch GitHub Pages status on mount or project change
@@ -653,7 +661,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
             {/* PLATFORM SELECTION CHECKBOXES */}
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-devtoys-sidebar/60 p-2.5 rounded-md border border-devtoys-border/60">
-              <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-semibold text-devtoys-primary">Target Platforms:</span>
 
                 <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary select-none">
@@ -693,6 +701,15 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   <FileCode className="w-3.5 h-3.5 text-devtoys-success" />
                   <span>GitHub Pages</span>
                 </label>
+
+                <button
+                  type="button"
+                  onClick={selectAllPlatforms}
+                  className="px-2 py-0.5 rounded text-[11px] font-semibold bg-devtoys-accent/15 text-devtoys-accent hover:bg-devtoys-accent/25 border border-devtoys-accent/30 transition-colors ml-1"
+                  title="Deploy to all 3 platforms (Vercel, Netlify, and GitHub Pages)"
+                >
+                  ✨ Select All 3
+                </button>
               </div>
 
               <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary text-[11px] select-none">
@@ -721,7 +738,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   </div>
                   <div>
                     <div className="font-bold text-sm text-devtoys-primary">
-                      {isPipelineRunning ? 'Running Automation Pipeline...' : '🚀 Push & Deploy to Selected Platforms at Once'}
+                      {isPipelineRunning
+                        ? 'Running Automation Pipeline...'
+                        : selectedPlatforms.vercel && selectedPlatforms.netlify && selectedPlatforms.githubPages
+                        ? '🚀 Deploy to All 3 Platforms (Vercel + Netlify + GitHub Pages)'
+                        : '🚀 Push & Deploy to Selected Platforms at Once'}
                     </div>
                     <div className="text-[11px] text-devtoys-secondary">
                       Automated pipeline: Git Push to GitHub &rarr; Live build & publish on{' '}

@@ -59,7 +59,7 @@ export const Step7SummaryDeploy: React.FC<Step7Props> = ({
   }>({
     vercel: true,
     netlify: true,
-    githubPages: false,
+    githubPages: true,
   });
 
   const [pipelineRes, setPipelineRes] = useState<PipelineResult | null>(null);
@@ -68,6 +68,14 @@ export const Step7SummaryDeploy: React.FC<Step7Props> = ({
 
   const toggleTarget = (target: 'vercel' | 'netlify' | 'githubPages') => {
     setSelectedTargets((prev) => ({ ...prev, [target]: !prev[target] }));
+  };
+
+  const selectAllTargets = () => {
+    setSelectedTargets({
+      vercel: true,
+      netlify: true,
+      githubPages: true,
+    });
   };
 
   const handlePushAndDeploy = async () => {
@@ -149,9 +157,18 @@ export const Step7SummaryDeploy: React.FC<Step7Props> = ({
 
       {/* Target Platforms Selection */}
       <div className="p-3 rounded-md border border-devtoys-border bg-devtoys-card space-y-2.5">
-        <span className="font-semibold text-devtoys-primary block text-xs">
-          Select Platforms for 1-Click Deployment:
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-devtoys-primary block text-xs">
+            Select Platforms for 1-Click Deployment:
+          </span>
+          <button
+            type="button"
+            onClick={selectAllTargets}
+            className="px-2 py-0.5 rounded text-[11px] font-semibold bg-devtoys-accent/15 text-devtoys-accent hover:bg-devtoys-accent/25 border border-devtoys-accent/30 transition-colors"
+          >
+            ✨ Select All 3 (Vercel + Netlify + GH Pages)
+          </button>
+        </div>
         <div className="flex items-center gap-4 flex-wrap text-xs">
           <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary select-none">
             <input
@@ -311,7 +328,9 @@ export const Step7SummaryDeploy: React.FC<Step7Props> = ({
               loading={loading}
               icon={<Rocket className="w-3.5 h-3.5" />}
             >
-              🚀 Push & Deploy Selected Platforms (Automated)
+              {selectedTargets.vercel && selectedTargets.netlify && selectedTargets.githubPages
+                ? '🚀 Deploy to All 3 Platforms (Vercel + Netlify + GitHub Pages)'
+                : '🚀 Push & Deploy Selected Platforms (Automated)'}
             </Button>
           </div>
         )}

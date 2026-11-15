@@ -6,7 +6,7 @@ import { githubManager } from './githubManager';
 import { vercelManager } from './vercelManager';
 import { netlifyManager } from './netlifyManager';
 import { ghPagesManager } from './ghPagesManager';
-import { pushAndDeployPipeline } from './deploymentPipeline';
+import { pushAndDeployPipeline, deployGitHubRepoPipeline, DeployGitHubRepoOptions } from './deploymentPipeline';
 import { configManager } from './configManager';
 import { openInTerminal } from './terminalHelper';
 import { logger } from './logger';
@@ -88,6 +88,10 @@ export function setupIpcHandlers() {
   // Git Setup
   ipcMain.handle('init-git-repo', async (_, folderPath: string, branch: string) => {
     return gitManager.initRepo(folderPath, branch);
+  });
+
+  ipcMain.handle('clone-repo', async (_, repoUrl: string, targetPath: string) => {
+    return gitManager.cloneRepo(repoUrl, targetPath);
   });
 
   ipcMain.handle('apply-gitignore', async (_, folderPath: string, content: string) => {
@@ -204,8 +208,15 @@ export function setupIpcHandlers() {
         branchName,
         isProduction ?? true,
         customSlug,
-        targets || ['vercel']
+        targets || ['vercel', 'netlify', 'github-pages']
       );
+    }
+  );
+
+  ipcMain.handle(
+    'deploy-github-repo',
+    async (_, options: DeployGitHubRepoOptions) => {
+      return deployGitHubRepoPipeline(options);
     }
   );
 

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Shield,
   X,
+  Rocket,
 } from 'lucide-react';
 
 export type NavItemId =
@@ -22,6 +23,7 @@ export type NavItemId =
   | 'repo-setup'
   | 'branches-remotes'
   | 'manual-push'
+  | 'deploy-repo'
   | 'vercel-projects'
   | 'deployment-status'
   | 'activity-logs'
@@ -97,6 +99,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Deployment',
       items: [
+        {
+          id: 'deploy-repo',
+          label: 'Deploy GitHub Repo',
+          icon: <Rocket className="w-4 h-4 text-devtoys-accent" />,
+          badge: 'All 3',
+        },
         {
           id: 'vercel-projects',
           label: 'Vercel Projects',

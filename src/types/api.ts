@@ -263,6 +263,14 @@ export interface MultiDeployPipelineOptions {
   isProduction?: boolean;
 }
 
+export interface DeployGitHubRepoOptions {
+  repoUrl: string;
+  targetPath?: string;
+  branchName?: string;
+  customSlug?: string;
+  targets: Array<'vercel' | 'netlify' | 'github-pages'>;
+}
+
 // IPC Interface exposed via contextBridge
 export interface DeployHubAPI {
   // Folder & Inspection
@@ -271,6 +279,7 @@ export interface DeployHubAPI {
   
   // Git Actions
   initGitRepo: (folderPath: string, branch: string) => Promise<ActionResult<{ branch: string }>>;
+  cloneRepo: (repoUrl: string, targetPath: string) => Promise<ActionResult<{ path: string }>>;
   applyGitignore: (folderPath: string, content: string) => Promise<ActionResult<void>>;
   createInitialCommit: (folderPath: string, message: string) => Promise<ActionResult<{ commitHash: string }>>;
   getManualPushCommand: (folderPath: string, remoteName: string, branchName: string) => Promise<ActionResult<ManualPushInfo>>;
@@ -315,6 +324,9 @@ export interface DeployHubAPI {
     customSlug?: string,
     targets?: Array<'vercel' | 'netlify' | 'github-pages'>
   ) => Promise<ActionResult<PipelineResult>>;
+  deployGitHubRepo: (
+    options: DeployGitHubRepoOptions
+  ) => Promise<ActionResult<{ project: ProjectRecord; pipeline: PipelineResult }>>;
   
   // Project Registry & Storage
   getProjects: () => Promise<ProjectRecord[]>;

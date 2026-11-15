@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { pushAndDeployPipeline } from '../electron/main/deploymentPipeline';
+import { pushAndDeployPipeline, deployGitHubRepoPipeline } from '../electron/main/deploymentPipeline';
 import { gitManager } from '../electron/main/gitManager';
 import { vercelManager } from '../electron/main/vercelManager';
 import { netlifyManager } from '../electron/main/netlifyManager';
 import { ghPagesManager } from '../electron/main/ghPagesManager';
+import { configManager } from '../electron/main/configManager';
 
 vi.mock('../electron/main/gitManager', () => ({
   gitManager: {
     pushRepo: vi.fn(),
+    cloneRepo: vi.fn(),
   },
 }));
 
@@ -26,6 +28,13 @@ vi.mock('../electron/main/netlifyManager', () => ({
 vi.mock('../electron/main/ghPagesManager', () => ({
   ghPagesManager: {
     deploy: vi.fn(),
+  },
+}));
+
+vi.mock('../electron/main/configManager', () => ({
+  configManager: {
+    getProjects: vi.fn().mockReturnValue([]),
+    saveProject: vi.fn().mockImplementation((p) => p),
   },
 }));
 
@@ -155,5 +164,92 @@ describe('pushAndDeployPipeline', () => {
     expect(result.data?.results?.githubPages?.url).toBe('https://suvancode.github.io/my-app/');
     expect(result.data?.results?.githubPages?.isLive).toBe(true);
     expect(result.data?.results?.githubPages?.status).toBe('built');
+  });
+
+  it('should deploy to all three platforms (vercel, netlify, github-pages)', async () => {
+    vi.mocked(gitManager.pushRepo).mockResolvedValueOnce({
+      success: true,
+      data: { output: 'Everything up-to-date' },
+    });
+
+    vi.mocked(vercelManager.deployInitial).mockResolvedValueOnce({
+      success: true,
+      data: { url: 'https://super-app.vercel.app' },
+    });
+
+    vi.mocked(netlifyManager.deploy).mockResolvedValueOnce({
+      success: true,
+      data: { url: 'https://super-app.netlify.app' },
+    });
+
+    vi.mocked(ghPagesManager.deploy).mockResolvedValueOnce({
+      success: true,
+      data: {
+        url: 'https://suvancode.github.io/super-app/',
+        isLive: true,
+        status: 'built',
+        message: 'Live',
+      },
+    });
+
+    const result = await pushAndDeployPipeline(
+      'C:\\fake\\path',
+      'origin',
+      'main',
+      true,
+      'super-app',
+      ['vercel', 'netlify', 'github-pages']
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.results?.vercel?.url).toBe('https://super-app.vercel.app');
+    expect(result.data?.results?.netlify?.url).toBe('https://super-app.netlify.app');
+    expect(result.data?.results?.githubPages?.url).toBe('https://suvancode.github.io/super-app/');
+  });
+
+  it('should clone and deploy GitHub repo to all 3 platforms via deployGitHubRepoPipeline', async () => {
+    vi.mocked(gitManager.cloneRepo).mockResolvedValueOnce({
+      success: true,
+      data: { path: 'C:\\fake\\path\\my-repo' },
+    });
+
+    vi.mocked(gitManager.pushRepo).mockResolvedValueOnce({
+      success: true,
+      data: { output: 'Everything up-to-date' },
+    });
+
+    vi.mocked(vercelManager.deployInitial).mockResolvedValueOnce({
+      success: true,
+      data: { url: 'https://my-repo.vercel.app' },
+    });
+
+    vi.mocked(netlifyManager.deploy).mockResolvedValueOnce({
+      success: true,
+      data: { url: 'https://my-repo.netlify.app' },
+    });
+
+    vi.mocked(ghPagesManager.deploy).mockResolvedValueOnce({
+      success: true,
+      data: {
+        url: 'https://suvancode.github.io/my-repo/',
+        isLive: true,
+        status: 'built',
+      },
+    });
+
+    const result = await deployGitHubRepoPipeline({
+      repoUrl: 'https://github.com/suvancode/my-repo.git',
+      targetPath: 'C:\\fake\\path\\my-repo',
+      branchName: 'main',
+      customSlug: 'my-repo',
+      targets: ['vercel', 'netlify', 'github-pages'],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.project.name).toBe('my-repo');
+    expect(result.data?.project.vercelProductionUrl).toBe('https://my-repo.vercel.app');
+    expect(result.data?.project.netlifyProductionUrl).toBe('https://my-repo.netlify.app');
+    expect(result.data?.project.githubPagesUrl).toBe('https://suvancode.github.io/my-repo/');
+    expect(configManager.saveProject).toHaveBeenCalled();
   });
 });

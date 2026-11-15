@@ -6,6 +6,7 @@ import {
   VercelProjectConfig,
   ProjectRecord,
   AppSettings,
+  DeployGitHubRepoOptions,
 } from '../../src/types/api';
 
 const api: DeployHubAPI = {
@@ -13,6 +14,7 @@ const api: DeployHubAPI = {
   inspectProject: (folderPath: string) => ipcRenderer.invoke('inspect-project', folderPath),
 
   initGitRepo: (folderPath: string, branch: string) => ipcRenderer.invoke('init-git-repo', folderPath, branch),
+  cloneRepo: (repoUrl: string, targetPath: string) => ipcRenderer.invoke('clone-repo', repoUrl, targetPath),
   applyGitignore: (folderPath: string, content: string) => ipcRenderer.invoke('apply-gitignore', folderPath, content),
   createInitialCommit: (folderPath: string, message: string) => ipcRenderer.invoke('create-initial-commit', folderPath, message),
   getManualPushCommand: (folderPath: string, remoteName: string, branchName: string) =>
@@ -64,6 +66,9 @@ const api: DeployHubAPI = {
     targets?: Array<'vercel' | 'netlify' | 'github-pages'>
   ) =>
     ipcRenderer.invoke('push-and-deploy', folderPath, remoteName, branchName, isProduction, customSlug, targets),
+
+  deployGitHubRepo: (options: DeployGitHubRepoOptions) =>
+    ipcRenderer.invoke('deploy-github-repo', options),
 
   getProjects: () => ipcRenderer.invoke('get-projects'),
   getProject: (id: string) => ipcRenderer.invoke('get-project', id),

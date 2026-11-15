@@ -55,8 +55,16 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
   }>({
     vercel: true,
     netlify: true,
-    githubPages: false,
+    githubPages: true,
   });
+
+  const selectAllTargets = () => {
+    setSelectedTargets({
+      vercel: true,
+      netlify: true,
+      githubPages: true,
+    });
+  };
 
   // Automation states
   const [isPushing, setIsPushing] = useState(false);
@@ -383,6 +391,14 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
                       <FileCode className="w-3.5 h-3.5 text-devtoys-success" />
                       <span>GH Pages</span>
                     </label>
+
+                    <button
+                      type="button"
+                      onClick={selectAllTargets}
+                      className="px-2 py-0.5 rounded text-[10px] font-semibold bg-devtoys-accent/15 text-devtoys-accent hover:bg-devtoys-accent/25 border border-devtoys-accent/30 transition-colors ml-1"
+                    >
+                      ✨ Select All 3
+                    </button>
                   </div>
 
                   <label className="flex items-center gap-1.5 cursor-pointer text-devtoys-secondary text-[11px] select-none">
@@ -404,7 +420,9 @@ export const ManualPushPage: React.FC<ManualPushPageProps> = ({
                   loading={isPipelineRunning}
                   icon={<Rocket className="w-4 h-4" />}
                 >
-                  🚀 Push & Deploy Selected Platforms (Automated)
+                  {selectedTargets.vercel && selectedTargets.netlify && selectedTargets.githubPages
+                    ? '🚀 Deploy to All 3 Platforms (Vercel + Netlify + GH Pages)'
+                    : '🚀 Push & Deploy Selected Platforms (Automated)'}
                 </Button>
 
                 {/* Quick Individual Buttons */}

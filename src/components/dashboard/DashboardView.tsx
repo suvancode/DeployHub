@@ -14,6 +14,7 @@ import {
   Trash2,
   Copy,
   Check,
+  Rocket,
 } from 'lucide-react';
 import { ProjectRecord } from '../../types/api';
 import { ProjectCard } from './ProjectCard';
@@ -24,6 +25,7 @@ import { Modal } from '../common/Modal';
 interface DashboardViewProps {
   projects: ProjectRecord[];
   onStartNewSetup: () => void;
+  onDeployGitHubRepo?: () => void;
   onSelectProject: (project: ProjectRecord) => void;
   onOpenFolder: (path: string) => void;
   onOpenTerminal: (path: string) => void;
@@ -35,6 +37,7 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   projects,
   onStartNewSetup,
+  onDeployGitHubRepo,
   onSelectProject,
   onOpenFolder,
   onOpenTerminal,
@@ -126,6 +129,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <Button variant="secondary" size="sm" onClick={onRefresh} icon={<RefreshCw className="w-3 h-3" />}>
             Refresh
           </Button>
+
+          {onDeployGitHubRepo && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onDeployGitHubRepo}
+              icon={<Rocket className="w-3.5 h-3.5 text-devtoys-accent" />}
+              className="border-devtoys-accent/40 text-devtoys-accent hover:bg-devtoys-accent/15"
+            >
+              Deploy GitHub Repo (All 3)
+            </Button>
+          )}
 
           <Button
             variant="primary"
@@ -276,7 +291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <p className="text-xs text-devtoys-muted max-w-sm mx-auto mt-1 leading-relaxed">
             Select a project folder to inspect its Git state, link a GitHub repository, and connect Vercel.
           </p>
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex items-center justify-center gap-2">
             <Button
               variant="primary"
               size="sm"
@@ -285,6 +300,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               Select Project Folder
             </Button>
+            {onDeployGitHubRepo && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onDeployGitHubRepo}
+                icon={<Rocket className="w-3.5 h-3.5 text-devtoys-accent" />}
+              >
+                Deploy GitHub Repo (All 3)
+              </Button>
+            )}
           </div>
         </div>
       ) : (
